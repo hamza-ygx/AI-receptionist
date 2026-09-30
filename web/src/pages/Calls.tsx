@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams, Link, useParams } from "react-router-dom";
+import { useAuth } from "../auth";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { api, qs } from "../api";
@@ -107,13 +108,23 @@ function Transcript({ text }: { text: string }) {
 export function CallDetailPage() {
   const { t } = useTranslation();
   const { id = "" } = useParams();
+  const nav = useNavigate();
+  const { me } = useAuth();
   const q = useQuery({ queryKey: ["call", id], queryFn: () => api<CallDetail>("GET", `/calls/${encodeURIComponent(id)}`) });
+  const erase = async () => {
+    if (!confirm(t("calls.eraseConfirm"))) return;
+    await api("DELETE", `/calls/${encodeURIComponent(id)}`);
+    nav("/calls", { replace: true });
+  };
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorAlert error={q.error} />;
   const { call, bookings, messages, transfers } = q.data;
   return (
     <>
-      <PageHead title={`${t("calls.detailTitle")} ${dateLong(call.started_at)}`} actions={<Link className="btn" to="/calls">{t("common.back")}</Link>} />
+      <PageHead title={`${t("calls.detailTitle")} ${dateLong(call.started_at)}`} actions={<>
+        {me?.user.role === "admin" && <button className="btn btn-danger" onClick={erase}>{t("calls.erase")}</button>}
+        <Link className="btn" to="/calls">{t("common.back")}</Link>
+      </>} />
       <div className="grid grid-2">
         <div className="card card-pad">
           <h2>{t("calls.summary")}</h2>

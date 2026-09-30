@@ -7,6 +7,8 @@ import { recomputeRollups } from "../retention/rollups.js";
 import { purgeExpired } from "../retention/purge.js";
 import { postPendingMessages } from "../teams/notify.js";
 import { runScrape } from "../kb/ingest.js";
+import { migrate } from "../db/migrate.js";
+import { seed } from "../db/seed.js";
 
 async function retentionDaily(_t: Timer, ctx: InvocationContext): Promise<void> {
   const log = logger(ctx);
@@ -31,6 +33,28 @@ export function registerVoice(): void {
     methods: ["GET"],
     authLevel: "anonymous",
     handler: async () => ({ status: 200, jsonBody: { ok: true } }),
+  });
+
+  app.http("adminMigrate", {
+    route: "admin/migrate",
+    methods: ["POST"],
+    authLevel: "admin",
+    handler: async (_req, ctx) => {
+      const lines: string[] = [];
+      const applied = await migrate((m) => { lines.push(m); ctx.log(m); });
+      return { status: 200, jsonBody: { applied, log: lines } };
+    },
+  });
+
+  app.http("adminSeed", {
+    route: "admin/seed",
+    methods: ["POST"],
+    authLevel: "admin",
+    handler: async (_req, ctx) => {
+      const lines: string[] = [];
+      await seed((m) => { lines.push(m); ctx.log(m); });
+      return { status: 200, jsonBody: { ok: true, log: lines } };
+    },
   });
 
   app.timer("vapiDeletions", {

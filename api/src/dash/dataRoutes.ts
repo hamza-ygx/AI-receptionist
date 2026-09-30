@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { QueueClient } from "@azure/storage-queue";
 import { DefaultAzureCredential } from "@azure/identity";
-import { db } from "../lib/db.js";
+import { db, tx } from "../lib/db.js";
 import { errMsg } from "../lib/log.js";
 import { embedMissingFaqs, decideRetrievalMode } from "../kb/ingest.js";
 import { audit, HttpError, parse, route } from "./http.js";
@@ -60,6 +60,26 @@ route("GET", "/calls/:id", "user", async (c) => {
   ]);
   await audit(c.session!.userId, "call.viewed", id);
   return { body: { call, bookings: bookings.rows, messages: messages.rows, transfers: transfers.rows } };
+});
+
+route("DELETE", "/calls/:id", "admin", async (c) => {
+  const id = parse(z.string().min(1).max(128), c.params.id);
+  const deleted = await tx(async (t) => {
+    const r = await t.query("DELETE FROM calls WHERE id = $1", [id]);
+    await t.query("DELETE FROM bookings WHERE call_id = $1", [id]);
+    await t.query("DELETE FROM messages WHERE call_id = $1", [id]);
+    await t.query("DELETE FROM transfers WHERE call_id = $1", [id]);
+    await t.query("DELETE FROM tool_call_results WHERE call_id = $1", [id]);
+    await t.query(
+      `INSERT INTO vapi_deletions (call_id) VALUES ($1)
+       ON CONFLICT (call_id) DO UPDATE SET next_attempt_at = now() WHERE vapi_deletions.confirmed_at IS NULL`,
+      [id],
+    );
+    return r.rowCount ?? 0;
+  });
+  if (!deleted) throw new HttpError(404, "not_found");
+  await audit(c.session!.userId, "call.erased", id);
+  return { body: { ok: true } };
 });
 
 route("GET", "/messages", "user", async (c) => {

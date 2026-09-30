@@ -1,6 +1,6 @@
 # RKJH AI Receptionist — Phase 1 Plan
 
-Status: **DRAFT — awaiting approval.** No code is written until this plan is approved.
+Status: **Approved 2026-09-30** (model: gpt-5.4-mini, Data Zone EU; org no. 559060-3766). Implemented in phases 2–6; deviations are listed in §14.
 Date: 2026-09-30 · Timezone: Europe/Stockholm
 
 Research basis: the Vapi docs source (github.com/VapiAI/docs at HEAD `0a7c192`, 2026-09-30, the Fern source of docs.vapi.ai, plus `openapi.json`) and Microsoft and Twilio/Telnyx docs. docs.vapi.ai and rkjh.se were blocked by this sandbox's egress policy, so Vapi facts come from the docs repo, not the rendered site. Section 11 lists every fact that is not verified.
@@ -436,3 +436,22 @@ Local dev: `func start` (Core Tools), Postgres in Docker, and a `devtunnel` (or 
 | 4 | KB scraper + hybrid retrieval, retention/rollup job |
 | 5 | Dashboard (auth, call log, analytics, FAQ/KB) + `func-dash` |
 | 6 | Bicep infra, README/setup docs, Graph scoping doc, go-live checklist |
+
+---
+
+## 14. Implementation notes and deviations from this plan
+
+- **Runtime:** Node **22** on Flex Consumption, because Node 20 reached end-of-life in April 2026. TypeScript 7.
+- **Transfers:**
+  - Two-step design confirmed against the spec: `transfer-destination-request` carries no tool arguments, so `transfer_to_staff` stores the approved target first.
+  - Vapi also documents a `controlUrl` live-call-control transfer, which is kept as an alternative. It is not used, because the destination-request path is the one documented to accept a full `transferPlan` with the warm-transfer assistant.
+- **Idempotency:** tool calls are de-duplicated per `toolCallId` (advisory lock plus a cached result). `tool-calls` stays in `serverMessages` because the docs don't say whether a tool with its own server URL also notifies the assistant server.
+- **Structured outputs:** Vapi's JSON-schema DTO disallows `type: [..., "null"]` and numeric enums. Unknown values are empty strings or `"unknown"` and are normalised on ingest.
+- **Credentials:** `/credential` is not in Vapi's public OpenAPI spec, so credentials are created once in the dashboard and referenced by ID in the sync script.
+- **Migrations and seed in Azure:** Postgres is private, so `func-voice` exposes `POST /api/admin/migrate` and `/api/admin/seed` (Functions master key only). The voice identity owns the schema; the dash identity has DML only (`infra/scripts/pg-roles.sql`).
+- **GDPR erasure:** admin-only *Radera samtal* in the dashboard (`DELETE /api/dash/calls/:id`). It deletes all related rows, queues the Vapi deletion and is audited.
+- **Session limits:** 8 h idle and 24 h absolute.
+- **Password breach check:** fails closed if HIBP is unreachable. The user gets a "try again shortly" message.
+- **Teams:** cards are posted after the call ends, so they include the summary. High-urgency messages are posted immediately, and a 5-minute sweep catches anything missed.
+- **Knowledge base:** the retrieval mode is decided automatically after every crawl and every FAQ change. rkjh.se was unreachable from the build sandbox, so the real corpus size is still to be measured on the first production crawl.
+
