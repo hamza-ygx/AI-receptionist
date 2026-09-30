@@ -6,6 +6,7 @@ import { processVapiDeletions, unconfirmedDeletions } from "../retention/vapiDel
 import { recomputeRollups } from "../retention/rollups.js";
 import { purgeExpired } from "../retention/purge.js";
 import { postPendingMessages } from "../teams/notify.js";
+import { runScrape } from "../kb/ingest.js";
 
 async function retentionDaily(_t: Timer, ctx: InvocationContext): Promise<void> {
   const log = logger(ctx);
@@ -48,6 +49,17 @@ export function registerVoice(): void {
   app.timer("retentionDaily", {
     schedule: "0 30 0 * * *",
     handler: retentionDaily,
+  });
+
+  app.timer("kbScrapeWeekly", {
+    schedule: "0 0 1 * * 1",
+    handler: async (_t, ctx) => { await runScrape("timer", logger(ctx)); },
+  });
+
+  app.storageQueue("kbScrapeManual", {
+    queueName: "kb-scrape",
+    connection: "AzureWebJobsStorage",
+    handler: async (_msg, ctx) => { await runScrape("manual", logger(ctx)); },
   });
 
   app.timer("messagesSweep", {
