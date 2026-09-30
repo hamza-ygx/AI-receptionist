@@ -1,0 +1,59 @@
+{
+  "app": { "name": "RKJH Receptionist", "tagline": "AI-receptionist" },
+  "nav": { "calls": "Samtal", "messages": "Meddelanden", "analytics": "Statistik", "faq": "Kunskapsbas", "users": "Användare", "account": "Mitt konto", "logout": "Logga ut", "language": "In English" },
+  "common": {
+    "save": "Spara", "cancel": "Avbryt", "delete": "Ta bort", "edit": "Redigera", "close": "Stäng", "loading": "Laddar…", "error": "Något gick fel. Försök igen.",
+    "yes": "Ja", "no": "Nej", "all": "Alla", "search": "Sök", "from": "Från", "to": "Till", "clear": "Rensa", "back": "Tillbaka", "none": "–",
+    "prev": "Föregående", "next": "Nästa", "pageOf": "Sida {{page}} av {{pages}} · {{total}} träffar", "showTable": "Visa som tabell", "showChart": "Visa som diagram", "confirmDelete": "Vill du ta bort detta?"
+  },
+  "outcome": { "faq_answered": "Fråga besvarad", "booked": "Möte bokat", "transferred": "Kopplad", "message_taken": "Meddelande", "abandoned": "Avbrutet" },
+  "urgency": { "low": "Låg", "normal": "Normal", "high": "Hög" },
+  "lang": { "sv": "Svenska", "en": "Engelska", "unknown": "Okänt" },
+  "meeting": { "phone": "Telefon", "teams": "Teams", "office": "Kontoret" },
+  "transfer": { "requested": "Begärd", "dialing": "Ringer", "connected": "Kopplad", "no_answer": "Inget svar", "busy": "Upptaget", "failed": "Misslyckad", "cancelled": "Avbruten", "refused": "Nekad" },
+  "auth": {
+    "loginTitle": "Logga in", "loginIntro": "Endast för medarbetare på RKJH.", "email": "E-post", "password": "Lösenord", "login": "Logga in",
+    "forgot": "Glömt lösenordet?", "invalid": "Fel e-post eller lösenord.", "locked": "Kontot är tillfälligt låst efter för många försök. Försök igen senare.",
+    "tooMany": "För många försök. Vänta en stund och försök igen.",
+    "mfaTitle": "Tvåstegsverifiering", "mfaIntro": "Ange koden från din autentiseringsapp, eller en återställningskod.", "code": "Kod", "verify": "Verifiera", "invalidCode": "Fel kod.",
+    "enrollTitle": "Aktivera tvåstegsverifiering", "enrollIntro": "Administratörer måste använda tvåstegsverifiering. Skanna QR-koden med Microsoft Authenticator eller liknande app och ange sedan koden.",
+    "manualKey": "Kan du inte skanna? Lägg till manuellt med denna URI:",
+    "recoveryTitle": "Spara dina återställningskoder", "recoveryIntro": "Varje kod kan användas en gång om du tappar bort telefonen. Spara dem på ett säkert ställe – de visas bara nu.", "recoveryDone": "Jag har sparat koderna",
+    "forgotTitle": "Återställ lösenord", "forgotIntro": "Ange din e-postadress så skickar vi en länk om kontot finns.", "sendLink": "Skicka länk", "forgotSent": "Om adressen finns hos oss har en länk skickats. Den gäller i 30 minuter.",
+    "resetTitle": "Välj nytt lösenord", "newPassword": "Nytt lösenord", "repeatPassword": "Upprepa lösenordet", "passwordHint": "Minst 12 tecken. Lösenord som förekommit i dataintrång accepteras inte.",
+    "mismatch": "Lösenorden matchar inte.", "resetDone": "Lösenordet är ändrat. Du kan nu logga in.", "inviteTitle": "Aktivera ditt konto", "inviteDone": "Kontot är skapat. Logga in för att fortsätta.",
+    "badToken": "Länken är ogiltig eller har gått ut.", "toLogin": "Till inloggningen",
+    "password_too_short": "Lösenordet måste vara minst 12 tecken.", "password_breached": "Lösenordet har förekommit i ett dataintrång. Välj ett annat.",
+    "password_contains_email": "Lösenordet får inte innehålla din e-postadress.", "password_breach_check_unavailable": "Kunde inte kontrollera lösenordet just nu. Försök igen om en stund."
+  },
+  "calls": {
+    "title": "Samtal", "intro": "Samtal de senaste 30 dagarna. Äldre samtal raderas automatiskt.", "searchPlaceholder": "Namn, företag, ärende eller nummer",
+    "when": "Tid", "caller": "Uppringare", "reason": "Ärende", "outcome": "Utfall", "staff": "Konsult", "language": "Språk", "duration": "Längd", "empty": "Inga samtal matchar filtret.",
+    "detailTitle": "Samtal", "summary": "Sammanfattning", "fields": "Uppgifter", "transcript": "Transkription", "callerNumber": "Ringde från", "callbackNumber": "Återuppringning",
+    "company": "Företag", "urgency": "Brådska", "cost": "Kostnad", "endedReason": "Avslutsorsak", "bookings": "Bokningar", "messages": "Meddelanden", "transfers": "Kopplingar",
+    "noTranscript": "Ingen transkription sparad.", "vapiDeleted": "Raderat hos Vapi", "vapiPending": "Väntar på radering hos Vapi"
+  },
+  "messages": { "title": "Meddelanden", "intro": "Meddelanden som AI-receptionisten tagit emot.", "open": "Öppna", "handled": "Hanterade", "markHandled": "Markera hanterat", "reopen": "Öppna igen", "empty": "Inga meddelanden.", "handledBy": "Hanterat av {{name}}", "toReception": "Receptionen" },
+  "analytics": {
+    "title": "Statistik", "intro": "Anonym statistik som sparas även efter att samtalen raderats.", "range7": "7 dagar", "range30": "30 dagar", "range90": "90 dagar", "range365": "12 månader",
+    "calls": "Samtal", "bookings": "Bokningar", "transferRate": "Lyckade kopplingar", "avgDuration": "Snittlängd", "costPerCall": "Kostnad per samtal", "totalCost": "Total kostnad",
+    "callsPerDay": "Samtal per dag", "outcomes": "Utfall", "peakHours": "Samtal per timme på dygnet", "monthly": "Per månad", "month": "Månad", "day": "Dag", "hour": "Timme",
+    "ofAttempts": "{{connected}} av {{attempts}} försök", "messages": "Meddelanden", "updated": "Uppdaterad {{at}}", "noData": "Ingen data för perioden."
+  },
+  "faq": {
+    "title": "Kunskapsbas", "intro": "Manuella FAQ gäller före innehållet från webbplatsen.", "tabFaq": "Manuella FAQ", "tabPages": "Webbsidor", "add": "Ny fråga",
+    "questionSv": "Fråga (svenska)", "answerSv": "Svar (svenska)", "questionEn": "Fråga (engelska)", "answerEn": "Svar (engelska)", "tags": "Taggar (kommaseparerade)", "active": "Aktiv",
+    "answerHint": "Skriv exakt det receptionisten får säga. Priser och datum sägs bara om de står här ordagrant.", "inactive": "Inaktiv", "empty": "Inga FAQ ännu.",
+    "rescrape": "Läs in webbplatsen igen", "rescrapeQueued": "Inläsningen har startats. Det kan ta några minuter.", "scrapeRunning": "En inläsning pågår redan.",
+    "mode": "Hämtningsläge", "modeInline": "Hela kunskapsbasen skickas med i varje samtal (liten korpus)", "modeSearch": "Sökning i kunskapsbasen (större korpus)",
+    "corpus": "Storlek: ca {{tokens}} tokens", "lastRun": "Senaste inläsning", "pages": "Sidor", "url": "Adress", "status": "Status", "fetched": "Hämtad", "changed": "Ändrad", "chunks": "Delar", "tokens": "Tokens",
+    "gone": "Borttagen", "activePage": "Aktiv", "runs": "Inläsningar", "trigger": "Start", "errors": "Fel"
+  },
+  "users": {
+    "title": "Användare", "intro": "Endast inbjudna @rkjh.se-adresser kan logga in.", "invite": "Bjud in", "name": "Namn", "email": "E-post", "role": "Roll", "mfa": "Tvåsteg", "status": "Status", "lastSeen": "Senast aktiv",
+    "admin": "Administratör", "staff": "Medarbetare", "active": "Aktiv", "disabled": "Inaktiverad", "locked": "Låst", "disable": "Inaktivera", "enable": "Aktivera", "resetMfa": "Återställ tvåsteg",
+    "revoke": "Logga ut överallt", "pending": "Väntande inbjudningar", "expires": "Går ut", "revokeInvite": "Återkalla", "inviteSent": "Inbjudan skickad.", "lastAdmin": "Det måste finnas minst en aktiv administratör.",
+    "userExists": "Det finns redan en användare med den adressen.", "onlyRkjh": "Endast @rkjh.se-adresser kan bjudas in."
+  },
+  "account": { "title": "Mitt konto", "changePassword": "Byt lösenord", "current": "Nuvarande lösenord", "changed": "Lösenordet är ändrat. Övriga inloggningar har loggats ut.", "mfa": "Tvåstegsverifiering", "mfaOn": "Aktiverad", "mfaOff": "Inte aktiverad", "enableMfa": "Aktivera", "disableMfa": "Stäng av", "mfaAdminRequired": "Krävs för administratörer.", "theme": "Tema", "themeSystem": "Följ systemet", "themeLight": "Ljust", "themeDark": "Mörkt" }
+}

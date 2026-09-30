@@ -1,0 +1,59 @@
+{
+  "app": { "name": "RKJH Receptionist", "tagline": "AI receptionist" },
+  "nav": { "calls": "Calls", "messages": "Messages", "analytics": "Analytics", "faq": "Knowledge base", "users": "Users", "account": "My account", "logout": "Sign out", "language": "På svenska" },
+  "common": {
+    "save": "Save", "cancel": "Cancel", "delete": "Delete", "edit": "Edit", "close": "Close", "loading": "Loading…", "error": "Something went wrong. Please try again.",
+    "yes": "Yes", "no": "No", "all": "All", "search": "Search", "from": "From", "to": "To", "clear": "Clear", "back": "Back", "none": "–",
+    "prev": "Previous", "next": "Next", "pageOf": "Page {{page}} of {{pages}} · {{total}} results", "showTable": "Show as table", "showChart": "Show as chart", "confirmDelete": "Delete this item?"
+  },
+  "outcome": { "faq_answered": "Question answered", "booked": "Meeting booked", "transferred": "Transferred", "message_taken": "Message", "abandoned": "Abandoned" },
+  "urgency": { "low": "Low", "normal": "Normal", "high": "High" },
+  "lang": { "sv": "Swedish", "en": "English", "unknown": "Unknown" },
+  "meeting": { "phone": "Phone", "teams": "Teams", "office": "Office" },
+  "transfer": { "requested": "Requested", "dialing": "Dialing", "connected": "Connected", "no_answer": "No answer", "busy": "Busy", "failed": "Failed", "cancelled": "Cancelled", "refused": "Refused" },
+  "auth": {
+    "loginTitle": "Sign in", "loginIntro": "RKJH staff only.", "email": "E-mail", "password": "Password", "login": "Sign in",
+    "forgot": "Forgot your password?", "invalid": "Wrong e-mail or password.", "locked": "The account is temporarily locked after too many attempts. Try again later.",
+    "tooMany": "Too many attempts. Please wait and try again.",
+    "mfaTitle": "Two-step verification", "mfaIntro": "Enter the code from your authenticator app, or a recovery code.", "code": "Code", "verify": "Verify", "invalidCode": "Wrong code.",
+    "enrollTitle": "Enable two-step verification", "enrollIntro": "Administrators must use two-step verification. Scan the QR code with Microsoft Authenticator or a similar app, then enter the code.",
+    "manualKey": "Can't scan? Add it manually with this URI:",
+    "recoveryTitle": "Save your recovery codes", "recoveryIntro": "Each code works once if you lose your phone. Store them somewhere safe – they are only shown now.", "recoveryDone": "I have saved the codes",
+    "forgotTitle": "Reset password", "forgotIntro": "Enter your e-mail and we'll send a link if the account exists.", "sendLink": "Send link", "forgotSent": "If the address exists, a link has been sent. It is valid for 30 minutes.",
+    "resetTitle": "Choose a new password", "newPassword": "New password", "repeatPassword": "Repeat password", "passwordHint": "At least 12 characters. Passwords found in data breaches are not accepted.",
+    "mismatch": "The passwords do not match.", "resetDone": "Your password has been changed. You can now sign in.", "inviteTitle": "Activate your account", "inviteDone": "Your account is ready. Sign in to continue.",
+    "badToken": "The link is invalid or has expired.", "toLogin": "Go to sign in",
+    "password_too_short": "The password must be at least 12 characters.", "password_breached": "This password has appeared in a data breach. Choose another.",
+    "password_contains_email": "The password must not contain your e-mail address.", "password_breach_check_unavailable": "Couldn't check the password right now. Please try again shortly."
+  },
+  "calls": {
+    "title": "Calls", "intro": "Calls from the last 30 days. Older calls are deleted automatically.", "searchPlaceholder": "Name, company, reason or number",
+    "when": "Time", "caller": "Caller", "reason": "Reason", "outcome": "Outcome", "staff": "Consultant", "language": "Language", "duration": "Duration", "empty": "No calls match the filter.",
+    "detailTitle": "Call", "summary": "Summary", "fields": "Details", "transcript": "Transcript", "callerNumber": "Called from", "callbackNumber": "Callback",
+    "company": "Company", "urgency": "Urgency", "cost": "Cost", "endedReason": "Ended reason", "bookings": "Bookings", "messages": "Messages", "transfers": "Transfers",
+    "noTranscript": "No transcript stored.", "vapiDeleted": "Deleted at Vapi", "vapiPending": "Pending deletion at Vapi"
+  },
+  "messages": { "title": "Messages", "intro": "Messages taken by the AI receptionist.", "open": "Open", "handled": "Handled", "markHandled": "Mark handled", "reopen": "Reopen", "empty": "No messages.", "handledBy": "Handled by {{name}}", "toReception": "Reception" },
+  "analytics": {
+    "title": "Analytics", "intro": "Anonymous statistics, kept after calls are deleted.", "range7": "7 days", "range30": "30 days", "range90": "90 days", "range365": "12 months",
+    "calls": "Calls", "bookings": "Bookings", "transferRate": "Successful transfers", "avgDuration": "Avg. duration", "costPerCall": "Cost per call", "totalCost": "Total cost",
+    "callsPerDay": "Calls per day", "outcomes": "Outcomes", "peakHours": "Calls by hour of day", "monthly": "By month", "month": "Month", "day": "Day", "hour": "Hour",
+    "ofAttempts": "{{connected}} of {{attempts}} attempts", "messages": "Messages", "updated": "Updated {{at}}", "noData": "No data for this period."
+  },
+  "faq": {
+    "title": "Knowledge base", "intro": "Manual FAQs take precedence over website content.", "tabFaq": "Manual FAQ", "tabPages": "Web pages", "add": "New question",
+    "questionSv": "Question (Swedish)", "answerSv": "Answer (Swedish)", "questionEn": "Question (English)", "answerEn": "Answer (English)", "tags": "Tags (comma separated)", "active": "Active",
+    "answerHint": "Write exactly what the receptionist may say. Prices and dates are only said if they appear here verbatim.", "inactive": "Inactive", "empty": "No FAQs yet.",
+    "rescrape": "Re-read the website", "rescrapeQueued": "Re-reading has started. It may take a few minutes.", "scrapeRunning": "A re-read is already running.",
+    "mode": "Retrieval mode", "modeInline": "The whole knowledge base is sent with every call (small corpus)", "modeSearch": "Search in the knowledge base (larger corpus)",
+    "corpus": "Size: about {{tokens}} tokens", "lastRun": "Last read", "pages": "Pages", "url": "URL", "status": "Status", "fetched": "Fetched", "changed": "Changed", "chunks": "Chunks", "tokens": "Tokens",
+    "gone": "Removed", "activePage": "Active", "runs": "Runs", "trigger": "Trigger", "errors": "Errors"
+  },
+  "users": {
+    "title": "Users", "intro": "Only invited @rkjh.se addresses can sign in.", "invite": "Invite", "name": "Name", "email": "E-mail", "role": "Role", "mfa": "2-step", "status": "Status", "lastSeen": "Last active",
+    "admin": "Administrator", "staff": "Staff", "active": "Active", "disabled": "Disabled", "locked": "Locked", "disable": "Disable", "enable": "Enable", "resetMfa": "Reset 2-step",
+    "revoke": "Sign out everywhere", "pending": "Pending invites", "expires": "Expires", "revokeInvite": "Revoke", "inviteSent": "Invite sent.", "lastAdmin": "There must be at least one active administrator.",
+    "userExists": "A user with that address already exists.", "onlyRkjh": "Only @rkjh.se addresses can be invited."
+  },
+  "account": { "title": "My account", "changePassword": "Change password", "current": "Current password", "changed": "Password changed. Other sessions have been signed out.", "mfa": "Two-step verification", "mfaOn": "Enabled", "mfaOff": "Not enabled", "enableMfa": "Enable", "disableMfa": "Turn off", "mfaAdminRequired": "Required for administrators.", "theme": "Theme", "themeSystem": "Follow system", "themeLight": "Light", "themeDark": "Dark" }
+}
