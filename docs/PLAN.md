@@ -15,13 +15,14 @@ Research basis: the Vapi docs source (github.com/VapiAI/docs at HEAD `0a7c192`, 
 | Vapi data retention | **Zero Data Retention (org toggle)** + per-assistant `artifactPlan.recordingEnabled:false` + `DELETE /call/{id}` after ingest | Belt and braces. ZDR still delivers the end-of-call-report. |
 | Telephony | **Twilio** (+46 number, imported into Vapi) | Vapi documents its warm-transfer modes as Twilio-specific. Telnyx has no documented warm-transfer support and a documented A-law codec issue outside North America. See §9. |
 | Language handling | **Squad fallback**: a Swedish assistant (Azure STT sv-SE) and an English assistant (Azure STT en-US) with a `handoff` tool | The Vapi Azure transcriber takes exactly one locale and has no auto-LID. Trade-off in §4.3. |
-| LLM | Azure OpenAI in **swedencentral**, used through Vapi's `openai` model provider with an `azure-openai` credential pinned to `region: swedencentral`; region-pinned model ID (e.g. `gpt-5.4-mini:swedencentral`) | Vapi does not fail over a region-pinned request to another region. |
+| LLM | Azure OpenAI resource in **swedencentral**, used through Vapi's `openai` model provider with an `azure-openai` credential. **Primary: `gpt-5.4-mini`, Data Zone Standard (EU)**, `reasoning_effort: none`. **Strict-Sweden alternative: `gpt-5.1`, regional Standard.** Model ID is region-pinned (`…:swedencentral`). | gpt-4.1-mini and gpt-4o-mini are deprecated (retire 2027-04-14). gpt-5.4-mini isn't offered as regional Standard in swedencentral. Data Zone EU keeps processing inside the EU. Vapi never fails over a region-pinned request. |
 | STT/TTS | Azure Speech via BYOK credential (`provider:"azure", service:"speech", region:"swedencentral"`) | EU processing on our own Azure subscription. |
 | Webhook auth | Vapi **custom credential, HMAC-SHA256 with timestamp**, verified in constant time plus a ±5 min replay window | Stronger than a static bearer secret. The static `X-Vapi-Secret` bearer is the fallback. |
 | Call analysis | Vapi **Structured Outputs** (the successor to the deprecated `analysisPlan`), with the model pinned to the Azure credential. Fallback: compute summary and fields in our ingest Function with Azure OpenAI. | `analysisPlan` is marked deprecated in the spec. |
 | Transfer | Dynamic `transferCall` → `transfer-destination-request` → server-validated destination, `transferPlan.mode: "warm-transfer-experimental"` with a transfer assistant and `fallbackPlan.endCallEnabled:false` | Only this mode documents "return the customer to the original assistant" on no answer or busy. |
 | Knowledge retrieval | **Undecided until the first real crawl** (rkjh.se was blocked here). Estimated 7–15k tokens of Swedish text. Default: hybrid pgvector + FTS behind `search_knowledge`, plus an always-injected "core facts" block (< 1.5k tokens) through `variableValues`. | §6 |
-| Functions topology | **Two Function Apps from one codebase**: `func-voice` (public: Vapi webhooks, timers) and `func-dash` (linked to Static Web Apps) | Linking a Function App to SWA restricts it to SWA traffic, which would block Vapi. It also keeps the blast radius of each app separate. |
+| Functions topology | **Two Function Apps (Flex Consumption, Sweden Central, VNet-integrated outbound) from one codebase**: `func-voice` (public: Vapi webhooks, timers; `alwaysReady: 1` for latency) and `func-dash` (SWA linked backend) | The SWA linked backend takes over the app's inbound auth and forbids inbound IP restrictions and private endpoints, so Vapi webhooks can't share that app. Separate apps also keep each blast radius separate. |
+| Dashboard hosting | SWA **Standard, resource region `westeurope`** (Sweden Central isn't offered for SWA) | Static assets hold no personal data. **Flag:** `/api` requests (transcripts) pass through SWA's global edge. |
 
 ---
 
@@ -45,7 +46,7 @@ flowchart LR
   end
 
   subgraph Azure["Azure — Sweden Central"]
-    AOAI[Azure OpenAI<br/>gpt-5.x-mini]
+    AOAI[Azure OpenAI<br/>gpt-5.4-mini DataZone EU]
     Speech[Azure AI Speech<br/>STT + neural TTS]
     subgraph VNet
       FV[func-voice<br/>Vapi webhooks + timers]
@@ -53,7 +54,7 @@ flowchart LR
       PG[(PostgreSQL Flexible<br/>pgvector + FTS<br/>private access)]
     end
     KV[Key Vault]
-    SWA[Static Web Apps<br/>React dashboard]
+    SWA[Static Web Apps<br/>React dashboard<br/>westeurope / global edge]
     ACS[ACS Email<br/>EU data location]
     AI[App Insights<br/>masked logs]
   end
@@ -109,10 +110,10 @@ flowchart LR
   "firstMessageMode": "assistant-speaks-first",
   "firstMessage": "Välkommen till Revisionskonsulterna J Hägglund. Du pratar med en AI-assistent, och samtalet transkriberas så att vi kan hjälpa dig. Hur kan jag hjälpa dig? … If you prefer English, just say so.",
   "transcriber": { "provider": "azure", "language": "sv-SE", "segmentationStrategy": "Semantic" },
-  "voice": { "provider": "azure", "voiceId": "sv-SE-SofieNeural" },
+  "voice": { "provider": "azure", "voiceId": "sv-SE-SofieNeural" },  // alt: sv-SE-HilleviNeural
   "model": {
     "provider": "openai",
-    "model": "gpt-5.4-mini:swedencentral",
+    "model": "gpt-5.4-mini:swedencentral",   // Azure deployment name must equal this ID
     "temperature": 0.2,
     "messages": [{ "role": "system", "content": "<prompts/sv/system.v1.md with {{variables}}>" }],
     "toolIds": ["search_knowledge","resolve_staff","check_availability","book_meeting",
@@ -132,7 +133,8 @@ flowchart LR
   "endCallMessage": "Tack för samtalet, ha en fin dag!"
 }
 ```
-- The English assistant is identical except for the en-US transcriber, voice `en-GB-SoniaNeural` or `en-US-AvaNeural` (to confirm), the English prompt and firstMessage, and `handoff → sv`.
+- The English assistant is identical except for the en-US transcriber, voice `en-GB-SoniaNeural` (proposed; alternative `en-US-AvaNeural`), the English prompt and firstMessage, and `handoff → sv`.
+- Alternative worth one listening test: a **single multilingual voice** for both languages (`en-US-AvaMultilingualNeural` or `en-GB-AdaMultilingualNeural` both speak sv-SE), which keeps the same voice across the handoff. Native sv-SE voices usually sound more natural in Swedish.
 - Tool `messages` use the `contents` array (sv + en variants) for fillers such as "Ett ögonblick, jag kollar kalendern…".
 - The transcript is kept on (`transcriptPlan.enabled`) because we need it in the end-of-call-report. With ZDR on, Vapi does not retain it.
 
@@ -232,9 +234,10 @@ Middleware on every route:
 | PSTN → Twilio | Twilio. The SE number terminates on Twilio's platform; the media edge can be pinned to Ireland (`ie1`) / Frankfurt (`de1`). | **Partly.** Twilio is a US company; routing, signalling and control plane are US-based unless configured otherwise. |
 | Orchestration | Vapi EU region (AWS eu-central-1, inferred from the IPs) | **EU region, US company** → DPA + SCCs needed |
 | STT / TTS | Azure Speech swedencentral (BYOK) | Yes |
-| LLM | Azure OpenAI swedencentral, region-pinned | Yes, if a **regional Standard** deployment is used (not Global) |
+| LLM | Azure OpenAI swedencentral resource, Data Zone EU deployment | **EU** (Data Zone EU follows the EU Data Boundary and may include EFTA). Regional Standard (gpt-5.1) = Sweden. **Never Global.** |
 | Structured outputs | Vapi → model pinned to the Azure credential | Yes if the Azure credential is honoured; **to verify** |
-| Tools, DB, dashboard | Azure Sweden Central | Yes (SWA static content is served from a global CDN; it contains no personal data) |
+| Tools, DB | Azure Sweden Central | Yes |
+| Dashboard | SWA resource in westeurope; static assets via global edge; `/api` proxied via SWA edge → `func-dash` (Sweden Central) | Resource EU. **Flag:** edge nodes serving users in Sweden should be EU, but Microsoft doesn't guarantee the edge path. If this is unacceptable, the fallback is to serve the SPA from `func-dash`/App Service in Sweden Central and drop SWA. |
 | Graph / Teams | M365 tenant (EU data boundary if the tenant is EU) | Yes |
 
 **Flags:**
@@ -242,14 +245,14 @@ Middleware on every route:
 - The Twilio ↔ Vapi control path for warm transfer uses Twilio's REST API, which is US-hosted by default. Twilio's `ie1` region support in Vapi is **unverified**.
 
 ### 4.2 Voices
-- SV: `sv-SE-SofieNeural` (primary, warm and professional); `sv-SE-HilleviNeural` as the alternative.
-- EN: one matching female voice; to confirm by listening test.
-- Voice IDs are validated against Azure's voice list in Phase 2.
+- SV: `sv-SE-SofieNeural` (primary, warm and professional); `sv-SE-HilleviNeural` as the alternative. These are standard neural voices; there is no sv-SE HD voice.
+- EN: `en-GB-SoniaNeural` (primary), `en-US-AvaNeural` (alternative).
+- Both are available in swedencentral. Final pick after a listening test.
 
 ### 4.3 Language approach: squad (chosen) vs auto-LID transcriber
 - **Chosen:** Vapi's `azure` transcriber supports exactly one `language` and has no automatic language identification, so per your instruction we use the fallback. The SV assistant greets in Swedish and mentions English ("…If you prefer English, just say so."). On an English request or clearly English speech it calls `handoff` → EN assistant.
 - **Weakness:** English speech run through sv-SE STT comes out garbled but usually still recognisable as English. The prompt instructs "if the caller's words look like English or they ask for English → handoff". In testing we check the detection rate.
-- **Alternative with real auto-detect:** Gladia (`languageBehaviour: "automatic multiple languages"`, sv + en) is a French company with EU hosting, and Soniox and Speechmatics also support sv + auto. This gives one assistant and seamless switching, at the cost of another sub-processor and unknown sv accuracy. **Recommendation:** start with Azure + squad. If the handoff hit rate is poor in testing, trial Gladia EU. Deepgram `multi` does **not** cover Swedish, so it is excluded.
+- **Alternative with real auto-detect:** Gladia (`languageBehaviour: "automatic multiple languages"`, sv + en) is a French company with EU hosting, and Soniox and Speechmatics also support sv + auto. This gives one assistant and seamless switching, at the cost of another sub-processor and unknown sv accuracy. **Recommendation:** start with Azure + squad. If the handoff hit rate is poor in testing, trial Gladia EU. Deepgram `multi` does **not** cover Swedish (web-search only; deepgram.com was blocked), so it is excluded. Azure's own continuous language ID supports sv-SE + en-US, but Vapi's Azure transcriber doesn't expose it; the only way to get it would be a `custom-transcriber` we host ourselves, which is too much latency and complexity for v1.
 
 ---
 
@@ -324,6 +327,8 @@ erDiagram
 ## 7. Teams notifications
 - Teams **Workflows** ("When a Teams webhook request is received" → post card). Office 365 connectors are deprecated.
 - One workflow URL per consultant channel or chat, plus one reception channel. The URLs are secrets, stored in Key Vault and referenced from `staff.teams_webhook_ref`.
+- **Trigger auth:** set "Who can trigger the flow" to **Specific users in my tenant**, allowing only our app registration's service principal. `func-voice` sends an Entra client-credentials bearer token (`aud=https://service.flow.microsoft.com/`). Without this, the URL's SAS signature is the only protection.
+- Flows are owned by a user, so add a second co-owner (IT or admin) to avoid orphaned flows. Private-channel support is uncertain, so use standard channels or chats.
 - Adaptive Card 1.5 fields: caller, company, masked-in-title / full-in-body phone, language, reason, urgency (colour), outcome, summary, and an "Öppna samtal" button → `https://<swa>/calls/<id>`. Personal mentions via workflow `@mention` where supported, otherwise a channel per consultant.
 - Retries: 3× exponential. Failure → App Insights alert. The message stays in the DB regardless.
 
@@ -331,16 +336,21 @@ erDiagram
 
 ## 8. Security
 - **Graph:**
+  - `getSchedule`: ≤ 20 mailboxes per call, window < 62 days, `availabilityViewInterval` 15. The Swedish-time `Prefer: outlook.timezone="W. Europe Standard Time"` header is used.
+  - Teams links on app-created events need the consultant to have a Teams licence and policy; app-only `isOnlineMeeting` is widely reported to work but isn't explicitly documented. Verified on a real mailbox in Phase 3; the fallback is a static Teams meeting link per consultant.
   - App registration `rkjh-receptionist-graph` with the application permission `Calendars.ReadWrite` (admin consent).
   - Exchange **RBAC for Applications**: `New-ManagementScope` (a recipient filter on a mail-enabled security group `sg-receptionist-calendars`), `New-ServicePrincipal`, `New-ManagementRoleAssignment -Role "Application Calendars.ReadWrite"`, and verification with `Test-ServicePrincipalAuthorization`.
-  - The **Entra-level consent must then be removed**, otherwise tenant-wide access remains; that is the RBAC-for-Apps model.
+  - The **Entra-level consent must then be removed**. Entra and Exchange RBAC grants are a union, so the scope is useless while tenant-wide consent exists. Application Access Policies are marked legacy, so we don't use them.
+  - `MemberOfGroup` covers direct members only, and propagation can take up to about 2 h.
   - Exact steps go in `docs/graph-mailbox-scoping.md`.
   - Client credentials use a **certificate** in Key Vault, not a secret.
 - **Secrets:**
   - Key Vault references in app settings, managed identity on both Function Apps.
   - Postgres uses Entra auth for the Function managed identities (no DB password in Key Vault).
   - Nothing is in the repo; there is a `.env.example`.
-- **Postgres:** private access (VNet-integrated Function Apps), `require_secure_transport=on`, TLS 1.2+, no public endpoint.
+- **Postgres:** **private access** (VNet-integrated Function Apps). This networking mode is chosen at creation and **can't be changed later**. `require_secure_transport=on` (the default), `ssl_min_protocol_version=TLSv1.3`, no public endpoint. pgvector enabled via the `azure.extensions` allowlist (`VECTOR,PG_TRGM,CITEXT,PGCRYPTO`). Admin access for migrations goes through a jump path (Bastion or a short-lived deployment script in the VNet).
+- **Flex Consumption:** doesn't support `WEBSITE_TIME_ZONE`/`TZ`, so all Europe/Stockholm handling is explicit in code (`@js-temporal/polyfill` or Luxon, zone always set).
+- **Holidays:** `date-holidays` (SE), filtered to `public` + `bank`. That covers midsommarafton, julafton and nyårsafton. Overrides live in `config/office.yaml`.
 - **Prompt injection:** every limit is enforced in tool code (rate caps per call, allow-listed staff IDs, no numbers from the model, slot re-validation).
 - **Logging:** a masking logger wrapper strips phone numbers, emails and transcript fields. App Insights sampling is on and retention is 30 days.
 - **Dashboard headers:** CSP (strict, no inline), HSTS, frame-ancestors none; configured in `staticwebapp.config.json`.
@@ -351,8 +361,9 @@ erDiagram
 
 ## 9. Telephony recommendation: **Twilio**
 - **Warm transfer:** Vapi's docs say the classic warm-transfer modes are "supported on Twilio calls". `warm-transfer-experimental` also works over Twilio. For Telnyx no warm-transfer support is documented, and Vapi warns of an A-law codec mismatch "on some calls outside North America".
-- **Regulatory:** Swedish numbers need a regulatory bundle (company + address in Sweden). Use a **geographic 035 (Halmstad)** number, or a national 010 number if a geographic one isn't available.
-- **Trade-off:** Telnyx is cheaper and runs its own network with EU PoPs, but Vapi's transfer features are built around Twilio. A failed or looping transfer is the biggest user-facing risk in this project, so Twilio wins.
+- **Regulatory:** Twilio lists Swedish **mobile (+467), national (010) and toll-free** numbers; geographic (e.g. 035) availability is unclear. **Recommendation: a national 010 number.** Callers never see it because they dial RKJH's main number. The bundle needs the company name, organisationsnummer, and a Swedish business address with proof (registreringsbevis).
+- **EU:** Twilio IE1 (Dublin) inbound processing, with edges in Dublin/Frankfurt. It's **unverified** whether a natively imported Twilio number works with a **Vapi EU org** and IE1. If it doesn't, the fallback is a Twilio **Elastic SIP Trunk (IE1) → `sip.eu.vapi.ai`**. `warm-transfer-experimental` supports SIP, so the transfer design still holds.
+- **Trade-off:** Telnyx is cheaper, offers geographic 08/035-style local numbers and runs its own network, but warm transfer on Telnyx isn't documented in Vapi and there's a known A-law codec issue outside North America. A failed or looping transfer is the biggest user-facing risk in this project, so Twilio wins.
 - **Forwarding:** RKJH's operator sets up unconditional forwarding (e.g. `**21*<number>#` on mobile, or in the telecom provider's portal for a fixed line or PBX). The original caller ID must be passed through; this depends on the operator, so verify it.
 
 ---
@@ -385,13 +396,14 @@ Local dev: `func start` (Core Tools), Postgres in Docker, and a `devtunnel` (or 
 6. **Teams:** one channel per consultant, or one shared reception channel with @mentions? Who owns the Power Automate flows? They run under a user account.
 7. **Audit log retention** for staff actions: 1 year OK?
 8. **Can staff edit FAQs, or only admins?**
-9. **Twilio number type:** 035 geographic or 010 national? Who is the legal entity for the regulatory bundle? The org number is inconsistent across sources (556627-0277 vs 559060-3766); please confirm.
+9. **Twilio number type:** 010 national OK? Who is the legal entity for the regulatory bundle? The org number is inconsistent across sources (556627-0277 vs 559060-3766); please confirm.
 10. **Vapi EU org:** you need to create the org at `dashboard.eu.vapi.ai`. The signup flow is not documented.
 
 **Flags (GDPR / vendor):**
 - **Vapi** is a US company. It has an EU region, but there is no DPA or sub-processor list in the docs; request them via the Trust Center (security.vapi.ai) / security@vapi.ai. Confirm that ZDR is available on EU orgs and whether the Twilio integration runs from the EU region.
 - **Twilio:** US company. DPA + SCCs; `ie1` data residency is limited.
-- **Azure OpenAI:** needs a regional **Standard** deployment in swedencentral. Global/DataZone deployments may process outside Sweden (DataZone EU stays in the EU).
+- **Azure OpenAI:** gpt-5.4-mini in swedencentral is Data Zone EU only (EU/EFTA processing, not strictly Sweden). One Microsoft matrix conflicts even on that, so it's to be checked in the portal. If processing must stay in Sweden → `gpt-5.1` regional Standard, which is slightly slower. **Your call.**
+- **SWA:** no Sweden Central region; the dashboard API passes through SWA's global edge (see §4.1).
 - **HIPAA mode** in Vapi is mutually exclusive with ZDR and not relevant here.
 
 **Unverified (checked in Phase 2 against the live API):**
@@ -401,6 +413,9 @@ Local dev: `func start` (Core Tools), Postgres in Docker, and a `devtunnel` (or 
 - Warm-transfer-experimental behaviour in the Vapi EU region with Twilio numbers.
 - Whether `transfer-destination-request` includes the tool-call arguments. If it does, `transfer_to_staff` and `transferCall` can merge into one step.
 - Deepgram `multi` excluding Swedish (source: web search only).
+- Whether Vapi's OpenAI provider passes `reasoning_effort: none` to Azure. If it doesn't, gpt-5.x latency may be too high → fall back to `gpt-5.1` or a custom-LLM proxy in `func-voice`.
+- Flex Consumption as an SWA linked backend (undocumented). Fallback: `func-dash` on the Premium EP1 plan.
+- App-only Teams meeting creation via Graph.
 
 ---
 
