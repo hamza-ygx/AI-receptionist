@@ -1,0 +1,34 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "APP_ROLE": "all",
+    "PGHOST": "localhost",
+    "PGPORT": "5432",
+    "PGDATABASE": "rkjh",
+    "PGUSER": "rkjh",
+    "PGPASSWORD": "rkjh_local_only",
+    "VAPI_BASE_URL": "https://api.eu.vapi.ai",
+    "VAPI_API_KEY": "<vapi-private-api-key>",
+    "VAPI_SQUAD_ID": "<squad-id>",
+    "VAPI_WEBHOOK_AUTH_MODE": "hmac",
+    "VAPI_WEBHOOK_SECRET": "<hmac-secret>",
+    "VAPI_LLM_MODEL": "gpt-5.4-mini:swedencentral",
+    "TWILIO_NUMBER_E164": "+4610xxxxxxx",
+    "GRAPH_TENANT_ID": "<tenant-guid>",
+    "GRAPH_CLIENT_ID": "<client-id>",
+    "GRAPH_CLIENT_SECRET": "<dev-only-secret>",
+    "TEAMS_FLOW_AUTH": "none",
+    "TEAMS_WEBHOOK_RECEPTION": "<workflow-url>",
+    "AZURE_OPENAI_ENDPOINT": "https://<aoai>.openai.azure.com",
+    "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "text-embedding-3-small",
+    "KB_ROOT_URL": "https://rkjh.se",
+    "DASHBOARD_BASE_URL": "http://localhost:5173",
+    "ASSISTANT_NAME": "ASSISTANT_NAME"
+  },
+  "Host": {
+    "CORS": "http://localhost:5173",
+    "CORSCredentials": true
+  }
+}

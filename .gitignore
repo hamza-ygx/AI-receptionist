@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+local.settings.json
+*.log
+.DS_Store
+coverage/
+vapi/state.*.json
+!vapi/state.example.json
+.azure/
+*.pem
+*.pfx
+*.local.ts

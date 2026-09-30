@@ -1,0 +1,7 @@
+*.ts
+!dist/**
+src/
+tsconfig.json
+local.settings.json
+.env*
+node_modules/.cache

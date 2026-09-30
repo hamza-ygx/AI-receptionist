@@ -1,0 +1,13 @@
+{
+  "name": "rkjh-ai-receptionist",
+  "private": true,
+  "workspaces": ["api", "vapi", "web"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "db:migrate": "npm run db:migrate -w api",
+    "db:seed": "npm run db:seed -w api",
+    "vapi:sync": "npm run sync -w vapi --"
+  }
+}

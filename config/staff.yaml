@@ -1,0 +1,56 @@
+# Staff & routing config. Seeded into the DB with `npm run db:seed`.
+# directPhone: consultant's DIRECT line or mobile in E.164. NEVER the RKJH main number (035-17 55 70) — it forwards back to the AI and loops.
+# upn: M365 mailbox; must be a member of the mail-enabled security group scoped via Exchange RBAC for Applications.
+# teamsWebhookRef: name of an app setting (Key Vault reference) holding that consultant's Teams Workflow URL. null → reception channel.
+staff:
+  - id: jorgen-hagglund
+    name: Jörgen Hägglund
+    role: VD, auktoriserad revisor
+    topics: [revision, bokslut, årsredovisning, företagsvärdering, skatterådgivning]
+    directPhone: null        # TODO: fill in
+    upn: null                # TODO: e.g. jorgen@rkjh.se
+    teamsWebhookRef: null
+    languages: [sv, en]
+    transferable: false      # set true once directPhone is set
+    bookable: true
+    active: true
+
+  # - id: anna-exempel
+  #   name: Anna Exempel
+  #   role: Redovisningskonsult
+  #   topics: [bokföring, lön, moms, deklaration]
+  #   directPhone: "+46701234567"
+  #   upn: anna@rkjh.se
+  #   teamsWebhookRef: TEAMS_WEBHOOK_ANNA
+  #   languages: [sv]
+  #   transferable: true
+  #   bookable: true
+
+topicAliases:
+  årsbokslut: bokslut
+  bokslutet: bokslut
+  årsredovisningen: årsredovisning
+  revisor: revision
+  revisionen: revision
+  skatt: skatterådgivning
+  skatter: skatterådgivning
+  deklarera: deklaration
+  inkomstdeklaration: deklaration
+  deklarationen: deklaration
+  löner: lön
+  lönehantering: lön
+  löneadministration: lön
+  bokföringen: bokföring
+  redovisning: bokföring
+  momsen: moms
+  momsdeklaration: moms
+  starta eget: starta eget
+  starta företag: starta eget
+  audit: revision
+  accounting: bokföring
+  bookkeeping: bokföring
+  payroll: lön
+  tax: skatterådgivning
+  tax return: deklaration
+  annual report: årsredovisning
+  vat: moms

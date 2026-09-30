@@ -1,0 +1,56 @@
+companyName: Revisionskonsulterna J Hägglund
+assistantName: ASSISTANT_NAME
+officeAddress: Brogatan 9, 2 tr, 302 43 Halmstad
+
+# When the office is open (public hours from rkjh.se). Europe/Stockholm.
+openingHours:
+  mon: [["09:00", "12:00"]]
+  tue: [["09:00", "17:00"]]
+  wed: [["09:00", "17:00"]]
+  thu: [["09:00", "17:00"]]
+  fri: [["09:00", "16:00"]]
+  sat: []
+  sun: []
+
+# Live transfers only inside these hours (defaults to openingHours if omitted).
+transferHours:
+  mon: [["09:00", "11:45"]]
+  tue: [["09:00", "16:45"]]
+  wed: [["09:00", "16:45"]]
+  thu: [["09:00", "16:45"]]
+  fri: [["09:00", "15:45"]]
+  sat: []
+  sun: []
+
+# Bookable meeting hours (lunch excluded).
+bookingHours:
+  mon: [["09:00", "12:00"]]
+  tue: [["09:00", "12:00"], ["13:00", "17:00"]]
+  wed: [["09:00", "12:00"], ["13:00", "17:00"]]
+  thu: [["09:00", "12:00"], ["13:00", "17:00"]]
+  fri: [["09:00", "12:00"], ["13:00", "16:00"]]
+  sat: []
+  sun: []
+
+minNoticeHours: 24
+maxDaysAhead: 30
+slotDurationsMin: [30, 60]
+slotStepMin: 30
+bufferMin: 0
+
+holidays:
+  types: [public, bank]   # 'bank' covers midsommarafton, julafton, nyårsafton
+  extraClosed: []         # e.g. "2026-12-23"
+  extraOpen: []
+
+# Numbers the AI may NEVER transfer to (loop protection). Add the Twilio number too.
+blockedTransferNumbers:
+  - "+4635175570"
+
+receptionTeamsWebhookRef: TEAMS_WEBHOOK_RECEPTION
+
+limits:
+  maxBookingsPerCall: 2
+  maxMessagesPerCall: 3
+  maxTransfersPerCall: 2
+  maxToolCallsPerCall: 40

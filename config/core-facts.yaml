@@ -1,0 +1,20 @@
+# Always injected into the assistant prompt. Keep short (< 1.5k tokens) and factual.
+# Services list is taken from public search results of rkjh.se — verify before go-live.
+sv: |
+  Företag: Revisionskonsulterna J Hägglund AB (RKJH), org.nr 559060-3766. Grundat 1986 av Jörgen Hägglund.
+  Adress: Brogatan 9, 2 tr (ovanför gamla Telia-butiken), 302 43 Halmstad.
+  Telefon: 035-17 55 70. E-post: info@rkjh.se. Webb: rkjh.se.
+  Tjänster: revision, redovisning och rapportering, bokslut och årsredovisning, skatterådgivning, deklarationer, lön och HR-rådgivning,
+  affärsjuridik, företagsvärdering och överlåtelse, riskhantering, outsourcing, hållbar affärsutveckling, data och analys,
+  starta eget-rådgivning samt kurser och utbildningar.
+  Receptionisten kan: svara på allmänna frågor om byrån, boka möten med konsulter, koppla samtal under kontorstid och ta meddelanden.
+  Receptionisten kan inte: ge råd om redovisning, skatt, revision eller juridik, tolka regler, ange priser eller deadlines som inte står ordagrant i kunskapsbasen.
+en: |
+  Company: Revisionskonsulterna J Hägglund AB (RKJH), company reg. no. 559060-3766. Founded in 1986 by Jörgen Hägglund.
+  Address: Brogatan 9, 2nd floor, 302 43 Halmstad, Sweden.
+  Phone: +46 35 17 55 70. E-mail: info@rkjh.se. Web: rkjh.se.
+  Services: statutory audit, accounting and reporting, year-end closing and annual reports, tax advisory, tax returns, payroll and HR advisory,
+  business law, business valuation and transfers, risk management, outsourcing, sustainable business development, data and analytics,
+  start-up advice, and courses.
+  The receptionist can: answer general questions about the firm, book meetings with consultants, transfer calls during office hours and take messages.
+  The receptionist cannot: give accounting, tax, audit or legal advice, interpret rules, or state prices or deadlines that are not verbatim in the knowledge base.

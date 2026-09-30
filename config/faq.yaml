@@ -1,0 +1,20 @@
+# Seed FAQs (insert-only; edit afterwards in the dashboard). Manual FAQ wins over scraped website content.
+faqs:
+  - key: opening-hours
+    question_sv: Vilka öppettider har ni?
+    answer_sv: "Kontoret har öppet måndag 09–12, tisdag till torsdag 09–17 och fredag 09–16."
+    question_en: What are your opening hours?
+    answer_en: "The office is open Monday 9–12, Tuesday to Thursday 9–17 and Friday 9–16."
+    tags: [kontakt]
+  - key: address
+    question_sv: Var ligger ert kontor?
+    answer_sv: "Vi finns på Brogatan 9, två trappor upp (ovanför gamla Telia-butiken), 302 43 Halmstad."
+    question_en: Where is your office?
+    answer_en: "We are at Brogatan 9, second floor, 302 43 Halmstad."
+    tags: [kontakt]
+  - key: prices
+    question_sv: Vad kostar era tjänster?
+    answer_sv: "Priset beror på uppdraget. En konsult ger gärna en offert – jag kan boka ett möte eller ta ett meddelande."
+    question_en: What do your services cost?
+    answer_en: "Pricing depends on the engagement. A consultant can give you a quote – I can book a meeting or take a message."
+    tags: [pris]
