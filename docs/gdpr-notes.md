@@ -6,8 +6,8 @@ This is an internal tool that processes **client personal data**: names, company
 
 | Data | Where | Retention |
 |---|---|---|
-| Call audio | Streamed through Twilio → Vapi → Azure Speech. **Not recorded** (`recordingEnabled: false`). | Not stored |
-| Transcript, summary, structured fields | Vapi (EU org, ZDR: not retained) → our Postgres (Sweden Central, private network) | **30 days**, then hard-deleted |
+| Call audio | Streamed through Twilio (EU edge) → our media VM in Sweden Central (LiveKit) → Azure Speech. **Never recorded.** | Not stored |
+| Transcript, summary, structured fields | Built in memory on the media VM → Azure OpenAI (EU Data Zone) for the summary → our Postgres (Sweden Central, private network). Calls connected to a consultant are not transcribed after the handover. | **30 days**, then hard-deleted |
 | Messages, bookings, transfer log | Postgres | 30 days |
 | Calendar event (caller name, company, phone, topic) | Consultant's Outlook (M365) | **Outside the 30-day purge.** It follows RKJH's normal M365 retention (open question from the plan) |
 | Teams cards | Teams channel | Teams retention policy |
@@ -20,7 +20,6 @@ This is an internal tool that processes **client personal data**: names, company
 
 | Party | Role | Location | Action |
 |---|---|---|---|
-| **Vapi** | Voice orchestration | EU region (AWS, likely Frankfurt); **US company** | Sign the DPA and SCCs, get the sub-processor list, enable ZDR, and record a transfer impact assessment (TIA) |
 | **Twilio** | Telephony | US company; IE1 region optional | DPA/SCCs are part of Twilio's terms; record a TIA |
 | **Microsoft** (Azure, M365) | Hosting, AI, calendar, Teams, email | Sweden Central / EU Data Boundary | Covered by the Microsoft DPA/Product Terms |
 | Azure OpenAI Data Zone EU | LLM inference | EU/EFTA data zone | Switch to the regional `gpt-5.1` deployment if processing must stay in Sweden |
@@ -39,12 +38,12 @@ This is an internal tool that processes **client personal data**: names, company
 ## Data subject rights
 
 - **Access:** search the call log by name or number; the call detail view shows everything stored.
-- **Erasure:** dashboard → call → **Radera samtal (GDPR)** (admin only, audited). It deletes the call, transcript, messages, bookings rows and transfer log, and queues the Vapi deletion. Delete the Outlook event and the Teams card by hand if needed.
+- **Erasure:** dashboard → call → **Radera samtal (GDPR)** (admin only, audited). It deletes the call, transcript, messages, bookings rows and transfer log, and no copy remains at any voice platform. Delete the Outlook event and the Teams card by hand if needed.
 
 ## Security measures (summary)
 
 - **Network and hosting:** EU hosting. Postgres has private access only, Entra-only auth and TLS 1.3. Secrets live in Key Vault and are read through managed identities.
-- **Webhooks:** HMAC-signed with a replay window.
+- **Telephony edge:** the media VM only accepts SIP/RTP from Twilio's IP ranges, and Redis and LiveKit's API aren't exposed.
 - **Prompt-injection defence:** all limits are enforced server-side, and the model never supplies a phone number.
 - **Dashboard auth:**
   - invite-only `@rkjh.se`

@@ -15,12 +15,12 @@ param dashboardBaseUrl string = ''
 param acsCustomDomain string = ''
 param acsSender string = ''
 
-param vapiBaseUrl string = 'https://api.eu.vapi.ai'
-param vapiSquadId string = ''
-param vapiLlmModel string = 'gpt-5.4-mini:swedencentral'
-param twilioNumberE164 string = ''
-param graphTenantId string = tenant().tenantId
-param graphClientId string = ''
+@description('SSH public key for break-glass access to the media VM (no inbound SSH rule is opened).')
+param mediaSshPublicKey string
+param mediaVmSize string = 'Standard_D4s_v5'
+@description('Twilio SIP signalling CIDRs for your edge (IE1 Dublin / DE1 Frankfurt). Verify at twilio.com/docs/sip-trunking/ip-addresses.')
+param twilioSignallingCidrs array
+param twilioMediaCidrs array = ['168.86.128.0/18']
 param assistantName string = 'ASSISTANT_NAME'
 
 @description('Teams webhook app-setting names (TEAMS_WEBHOOK_*) whose values live as Key Vault secrets named the same with dashes, e.g. TEAMS_WEBHOOK_RECEPTION → teams-webhook-reception.')
@@ -62,7 +62,7 @@ module storage 'modules/storage.bicep' = {
     location: location
     name: take('st${compact}', 24)
     tags: tags
-    allowedSubnetIds: [network.outputs.voiceSubnetId, network.outputs.dashSubnetId]
+    allowedSubnetIds: [network.outputs.jobsSubnetId, network.outputs.dashSubnetId]
   }
 }
 
@@ -81,17 +81,16 @@ module email 'modules/email.bicep' = {
   params: { prefix: prefix, tags: tags, customDomain: acsCustomDomain }
 }
 
-module voice 'modules/functionapp.bicep' = {
-  name: 'func-voice'
+module jobs 'modules/functionapp.bicep' = {
+  name: 'func-jobs'
   params: {
     location: location
-    name: 'func-${prefix}-voice'
+    name: 'func-${prefix}-jobs'
     tags: tags
-    subnetId: network.outputs.voiceSubnetId
+    subnetId: network.outputs.jobsSubnetId
     storageName: storage.outputs.name
-    deploymentContainer: 'deploy-func-voice'
+    deploymentContainer: 'deploy-func-jobs'
     nodeVersion: nodeVersion
-    alwaysReady: 1
   }
 }
 
@@ -114,9 +113,33 @@ module swa 'modules/staticwebapp.bicep' = {
   params: { location: swaLocation, prefix: prefix, tags: tags, backendFunctionAppId: dash.outputs.id, backendRegion: location }
 }
 
-module voiceRoles 'modules/roles.bicep' = {
-  name: 'roles-voice'
-  params: { principalId: voice.outputs.principalId, keyVaultName: kv.outputs.name, openAIName: ai.outputs.openAIName }
+module jobsRoles 'modules/roles.bicep' = {
+  name: 'roles-jobs'
+  params: { principalId: jobs.outputs.principalId, keyVaultName: kv.outputs.name, openAIName: ai.outputs.openAIName }
+}
+
+module media 'modules/media.bicep' = {
+  name: 'media'
+  params: {
+    location: location
+    prefix: prefix
+    tags: tags
+    subnetId: network.outputs.mediaSubnetId
+    sshPublicKey: mediaSshPublicKey
+    vmSize: mediaVmSize
+    twilioSignallingCidrs: twilioSignallingCidrs
+    twilioMediaCidrs: twilioMediaCidrs
+  }
+}
+
+module mediaRoles 'modules/roles.bicep' = {
+  name: 'roles-media'
+  params: { principalId: media.outputs.principalId, keyVaultName: kv.outputs.name, openAIName: ai.outputs.openAIName }
+}
+
+module acr 'modules/acr.bicep' = {
+  name: 'acr'
+  params: { location: location, name: take('acr${compact}', 50), tags: tags, pullPrincipalIds: [media.outputs.principalId] }
 }
 
 module dashRoles 'modules/roles.bicep' = {
@@ -138,36 +161,27 @@ var common = {
   AZURE_OPENAI_ENDPOINT: ai.outputs.openAIEndpoint
   AZURE_OPENAI_EMBEDDING_DEPLOYMENT: 'text-embedding-3-small'
   AZURE_OPENAI_API_VERSION: '2024-10-21'
+  AZURE_OPENAI_CHAT_DEPLOYMENT: 'gpt-5.4-mini'
   DASHBOARD_BASE_URL: dashUrl
   ASSISTANT_NAME: assistantName
   RATE_LIMIT_SALT: kvRef(kvName, 'rate-limit-salt')
   RETENTION_DAYS: '30'
 }
 
-module voiceSettings 'modules/appsettings.bicep' = {
-  name: 'settings-voice'
+module jobsSettings 'modules/appsettings.bicep' = {
+  name: 'settings-jobs'
   params: {
-    appName: voice.outputs.name
+    appName: jobs.outputs.name
     storageName: storage.outputs.name
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     settings: union(common, {
-      APP_ROLE: 'voice'
-      PGUSER: voice.outputs.name
-      VAPI_BASE_URL: vapiBaseUrl
-      VAPI_API_KEY: kvRef(kvName, 'vapi-api-key')
-      VAPI_SQUAD_ID: vapiSquadId
-      VAPI_WEBHOOK_AUTH_MODE: 'hmac'
-      VAPI_WEBHOOK_SECRET: kvRef(kvName, 'vapi-webhook-secret')
-      VAPI_LLM_MODEL: vapiLlmModel
-      TWILIO_NUMBER_E164: twilioNumberE164
-      GRAPH_TENANT_ID: graphTenantId
-      GRAPH_CLIENT_ID: graphClientId
-      GRAPH_CLIENT_CERT_PEM: kvRef(kvName, 'graph-client-cert-pem')
+      APP_ROLE: 'jobs'
+      PGUSER: jobs.outputs.name
       TEAMS_FLOW_AUTH: 'entra'
       KB_ROOT_URL: 'https://rkjh.se'
     }, toObject(teamsWebhookRefs, r => r, r => kvRef(kvName, toLower(replace(r, '_', '-')))))
   }
-  dependsOn: [voiceRoles]
+  dependsOn: [jobsRoles]
 }
 
 module dashSettings 'modules/appsettings.bicep' = {
@@ -188,9 +202,12 @@ module dashSettings 'modules/appsettings.bicep' = {
   dependsOn: [dashRoles]
 }
 
-output voiceHostname string = voice.outputs.hostname
+output jobsHostname string = jobs.outputs.hostname
 output dashFunctionName string = dash.outputs.name
-output voiceFunctionName string = voice.outputs.name
+output jobsFunctionName string = jobs.outputs.name
+output mediaVmName string = media.outputs.vmName
+output mediaPublicIp string = media.outputs.publicIp
+output acrName string = acr.outputs.name
 output staticWebAppHostname string = swa.outputs.hostname
 output postgresFqdn string = postgres.outputs.fqdn
 output keyVaultName string = kv.outputs.name

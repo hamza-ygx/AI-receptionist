@@ -39,30 +39,6 @@ resource ag 'Microsoft.Insights/actionGroups@2023-01-01' = {
   }
 }
 
-resource deletionAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
-  name: 'alert-${prefix}-vapi-deletion'
-  location: location
-  tags: tags
-  properties: {
-    displayName: 'Vapi call deletion unconfirmed > 24h'
-    severity: 2
-    enabled: true
-    scopes: [appi.id]
-    evaluationFrequency: 'PT1H'
-    windowSize: 'P1D'
-    criteria: {
-      allOf: [{
-        query: 'traces | where message startswith "ALERT: Vapi call deletions unconfirmed"'
-        timeAggregation: 'Count'
-        operator: 'GreaterThan'
-        threshold: 0
-        failingPeriods: { numberOfEvaluationPeriods: 1, minFailingPeriodsToAlert: 1 }
-      }]
-    }
-    actions: { actionGroups: [ag.id] }
-  }
-}
-
 resource errorAlert 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = {
   name: 'alert-${prefix}-errors'
   location: location

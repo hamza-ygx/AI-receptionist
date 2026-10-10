@@ -30,9 +30,9 @@ resource blob 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
   properties: { deleteRetentionPolicy: { enabled: true, days: 7 } }
 }
 
-resource voicePkg 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource jobsPkg 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: blob
-  name: 'deploy-func-voice'
+  name: 'deploy-func-jobs'
 }
 
 resource dashPkg 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {

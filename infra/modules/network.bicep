@@ -13,7 +13,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
     addressSpace: { addressPrefixes: [addressSpace] }
     subnets: [
       {
-        name: 'snet-func-voice'
+        name: 'snet-func-jobs'
         properties: {
           addressPrefix: cidrSubnet(addressSpace, 26, 0)
           delegations: delegationFlex
@@ -41,6 +41,13 @@ resource vnet 'Microsoft.Network/virtualNetworks@2024-05-01' = {
           addressPrefix: cidrSubnet(addressSpace, 26, 3)
         }
       }
+      {
+        name: 'snet-media'
+        properties: {
+          addressPrefix: cidrSubnet(addressSpace, 26, 4)
+          serviceEndpoints: [{ service: 'Microsoft.KeyVault' }, { service: 'Microsoft.CognitiveServices' }, { service: 'Microsoft.ContainerRegistry' }]
+        }
+      }
     ]
   }
 }
@@ -62,8 +69,9 @@ resource pgDnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2024-0
 }
 
 output vnetId string = vnet.id
-output voiceSubnetId string = vnet.properties.subnets[0].id
+output jobsSubnetId string = vnet.properties.subnets[0].id
 output dashSubnetId string = vnet.properties.subnets[1].id
 output postgresSubnetId string = vnet.properties.subnets[2].id
 output adminSubnetId string = vnet.properties.subnets[3].id
+output mediaSubnetId string = vnet.properties.subnets[4].id
 output postgresDnsZoneId string = pgDns.id

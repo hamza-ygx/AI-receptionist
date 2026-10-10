@@ -9,94 +9,93 @@ AI phone receptionist for **Revisionskonsulterna J Hägglund** (rkjh.se). It ans
 
 A private dashboard shows the call log, messages and analytics, and has an FAQ editor.
 
-Internal tool that processes client personal data. It is EU-hosted with 30-day retention. See [docs/gdpr-notes.md](docs/gdpr-notes.md).
+It is an internal tool that processes client personal data. The call engine is **self-hosted [LiveKit](https://github.com/livekit/livekit)** on Azure in Sweden Central, with no Vapi and no LiveKit Cloud. Speech, LLM, database and dashboard stay on Azure in the EU, and calls are kept for 30 days. See [docs/gdpr-notes.md](docs/gdpr-notes.md).
 
 ## Architecture
 
 ```
-Caller → RKJH 035-17 55 70 ──forward──▶ Twilio +46 10… ──▶ Vapi (EU region) ──▶ Azure Speech + Azure OpenAI (Sweden Central)
-                                                              │  HMAC-signed webhooks
-                                                              ▼
-                                         func-voice (Azure Functions, Sweden Central, VNet)
-                                         ├─ tools: search_knowledge · resolve_staff · check_availability · book_meeting
-                                         │         transfer_to_staff (+ transfer-destination-request) · take_message
-                                         ├─ end-of-call ingest → Postgres → Teams card → DELETE /call at Vapi
-                                         └─ timers: retention (30 d) · rollups · KB scrape · Vapi-deletion retries
-                                                      │
-          Dashboard (React, Static Web Apps) ──/api/dash──▶ func-dash ──▶ PostgreSQL Flexible (private, pgvector)
+Caller → RKJH 035-17 55 70 ─forward→ Twilio +46 10… ─SIP trunk (EU edge)→ media VM (Sweden Central)
+                                                                           ├─ livekit/sip + livekit-server + redis
+                                                                           └─ rkjh-agent (LiveKit Agents, Node)
+                                                                                ├─ Azure Speech STT/TTS (sv-SE, en)
+                                                                                ├─ Azure OpenAI gpt-5.4-mini (Data Zone EU)
+                                                                                └─ tools → Postgres · Graph (Outlook) · Teams
+func-jobs  (Azure Functions): retention (30 d) · rollups · KB scrape · Teams sweep · admin migrate/seed
+func-dash  (Azure Functions) ◀── Static Web Apps (React dashboard)
+PostgreSQL Flexible Server (private, pgvector) — shared by all of the above
 ```
 
-The full design is in **[docs/PLAN.md](docs/PLAN.md)**: Mermaid diagrams, data model, endpoint list and decisions.
+Details: [docs/livekit.md](docs/livekit.md) (call engine) and [docs/PLAN.md](docs/PLAN.md) (data model, endpoints, decisions, deviations).
 
 ## Repository
 
 | Path | What |
 |---|---|
-| `api/` | Azure Functions v4 (Node 22, TypeScript, ESM). One codebase, two apps chosen by `APP_ROLE=voice\|dash`. |
-| `api/migrations/` | SQL migrations. Run them with `npm run db:migrate` or `POST /api/admin/migrate` (master key). |
+| `agent/` | LiveKit voice agent (TypeScript): STT/LLM/TTS pipeline, Swedish/English handoff, tools, warm transfer, post-call ingest. `agent/Dockerfile`. |
+| `api/` | Azure Functions v4 (Node 22, TS, ESM). `APP_ROLE=jobs\|dash`. `api/src/core` and `api/src/tools` hold the business logic that the agent shares. |
+| `api/migrations/` | SQL migrations. Run with `npm run db:migrate` or `POST /api/admin/migrate` (master key). |
+| `prompts/` | Versioned system prompts (`sv/`, `en/`). |
 | `web/` | Dashboard (React 19 + Vite). Swedish UI with English i18n. |
-| `vapi/` | Vapi config as code: tools, structured outputs, SV/EN assistants, squad, phone number, and versioned prompts in `vapi/prompts/`. `npm run vapi:sync` is a dry run by default. |
 | `config/` | `staff.yaml`, `office.yaml` (hours, holidays, loop protection), `core-facts.yaml`, `faq.yaml`. These are seeded into the DB. |
+| `deploy/media/` | Docker Compose stack for the media VM, plus `bootstrap.sh` (secrets from Key Vault via managed identity). |
 | `infra/` | Bicep (`main.bicep` plus modules), params, and scripts (`deploy.sh`, `set-secrets.sh`, `package-api.sh`, `pg-roles.sql`). |
-| `docs/` | Setup guides and GDPR notes. |
+| `docs/` | Setup guides, GDPR notes, suggested tests. |
 
 ## Local development
 
-Prerequisites: Node 22, Docker, [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local), and a dev tunnel (`devtunnel` or ngrok).
+Prerequisites: Node 22, Docker, [Azure Functions Core Tools v4](https://learn.microsoft.com/azure/azure-functions/functions-run-local), and the `livekit-server` binary.
 
 ```bash
 npm install
-docker compose up -d                                # Postgres 16 + pgvector, Azurite
+docker compose up -d                                         # Postgres 16 + pgvector, Azurite
 cp api/local.settings.example.json api/local.settings.json   # fill in values (see .env.example)
 npm run db:migrate && npm run db:seed
-npm run user:create-admin -w api -- you@rkjh.se "Your Name"   # prints a one-time invite link
-(cd api && npm run build && func start)             # http://localhost:7071
-npm run dev -w web                                  # http://localhost:5173 (proxies /api)
-devtunnel host -p 7071 --allow-anonymous            # public URL for Vapi webhooks (dev only)
+npm run user:create-admin -w api -- you@rkjh.se "Your Name"  # prints a one-time invite link
+(cd api && npm run build && func start)                      # dashboard API on :7071
+npm run dev -w web                                           # dashboard on :5173 (proxies /api)
+livekit-server --dev                                         # LiveKit on :7880 (devkey/secret)
+npm run agent:dev                                            # needs Azure Speech + OpenAI env, see docs/livekit.md
 ```
 
-Point a **dev** Vapi squad at the tunnel with `VOICE_API_BASE_URL=<tunnel-url> npm run vapi:sync -- --env dev --apply`. Never point production at a tunnel.
-
-Useful scripts:
-
-- `npm run kb:scrape -w api` crawls rkjh.se now.
-- `npm run typecheck` checks all packages.
-- `npm run vapi:sync -- --env dev --print` prints the generated payloads.
+Talk to the agent from LiveKit's Agents Playground or a test room. Real phone calls need the media VM and a Twilio trunk.
 
 ## Deploying
 
-The step-by-step guide is in [docs/setup-azure.md](docs/setup-azure.md). In short:
+See [docs/setup-azure.md](docs/setup-azure.md). In short:
 
 1. Complete the prerequisites:
-   - Vapi EU org: [docs/vapi.md](docs/vapi.md)
-   - Twilio number: [docs/telephony.md](docs/telephony.md)
+   - Twilio Elastic SIP trunk and +46 number: [docs/telephony.md](docs/telephony.md)
    - Graph app registration and mailbox scoping: [docs/graph-mailbox-scoping.md](docs/graph-mailbox-scoping.md)
    - Teams workflows: [docs/teams-workflows.md](docs/teams-workflows.md)
-2. Fill in `infra/params/prod.bicepparam`.
+2. Fill in `infra/params/prod.bicepparam` and `deploy/media/agent.env.static`.
 3. Run `RG=rg-rkjh-ai-prod ./infra/scripts/deploy.sh`. It is interactive and confirms each stage:
    1. infrastructure
    2. secrets
    3. API
    4. migrations and seed
-   5. dashboard
-4. Run `npm run vapi:sync -- --env prod`, then again with `--apply`. Put the squad ID into the params and redeploy the infrastructure.
-5. Buy and import the number, then set up unconditional forwarding from 035-17 55 70.
+   5. agent image
+   6. media VM
+   7. SIP trunks
+   8. dashboard
+4. Point the Twilio trunk's origination URI at the media VM's public IP, then forward 035-17 55 70 to the Twilio number.
 
 ## Environment variables
 
-All variables are documented in [`.env.example`](.env.example). In Azure, secrets are **Key Vault references** resolved by each Function App's managed identity. Nothing secret lives in the repo.
+- [`.env.example`](.env.example) covers the Functions apps.
+- [`deploy/media/agent.env.static.example`](deploy/media/agent.env.static.example) covers the agent.
+- In Azure, secrets are **Key Vault references** (Functions) or are pulled from Key Vault at boot (media VM). Nothing secret lives in the repo.
 
 ## Key decisions (short)
 
-- **Vapi EU region** with Zero Data Retention, recording off, and `DELETE /call/{id}` after ingest (retried until confirmed).
-- **Twilio** rather than Telnyx, because Vapi's warm-transfer modes are documented for Twilio. Transfers use `warm-transfer-experimental`, which returns the caller to the AI on no answer so it can take a message.
-- **Language**: Vapi's Azure transcriber is single-locale, so a squad hands off between a Swedish assistant (sv-SE) and an English one (en-GB).
-- **LLM**: `gpt-5.4-mini` on an Azure OpenAI **Data Zone EU** deployment in Sweden Central, `reasoning_effort: none`. Switch with `VAPI_LLM_MODEL`.
-- **Security**:
-  - Tools never trust model arguments. Server-side checks enforce office hours, the staff allow-list, the blocked-number list (loop protection), per-call limits and slot re-validation.
-  - Tool calls are idempotent per `toolCallId`.
-- **Knowledge base**: after each crawl, a corpus of 6k tokens or less is injected into the prompt. Otherwise the assistant uses hybrid pgvector + Swedish full-text search.
+- **Self-hosted LiveKit instead of Vapi.** There is no per-minute platform fee and no US voice-orchestration sub-processor. Only Twilio and Microsoft handle call data.
+- **Language.** Azure STT runs continuous sv-SE/en-US language identification, and the agent hands off automatically to an English agent with its own voice.
+- **TTS.** A custom streaming Azure Speech adapter keeps `sv-SE-SofieNeural` in Sweden Central.
+- **Transfers.** Warm transfer happens in the caller's own room: hold music, a private briefing, and the consultant presses 1 to accept or 2 to decline. Cold transfer via SIP REFER is available as an option. Loop protection blocks transfers to RKJH's main number.
+- **Security.**
+  - Tools never trust model arguments. The server enforces office hours, the staff allow-list, the blocked numbers, per-call limits and slot re-validation, and tool calls are idempotent.
+  - The media VM exposes only SIP and RTP, to Twilio's IP ranges only.
+- **Knowledge base.** After each crawl, a corpus of 6k tokens or less is injected into the prompt. A larger one is searched with hybrid pgvector + Swedish full-text search.
 
-## Suggested tests (not written yet; say the word)
+## Suggested tests (not written yet)
 
-See [docs/testing.md](docs/testing.md). The ones that matter most are tool-endpoint auth and validation, booking conflict and holiday/DST logic, the transfer loop guard, and the retention job.
+See [docs/testing.md](docs/testing.md).

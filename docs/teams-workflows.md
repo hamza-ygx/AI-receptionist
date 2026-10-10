@@ -8,13 +8,14 @@ You need one for the reception channel (required) and one per consultant, if the
 
 1. In Teams, open the channel → **⋯ → Workflows → "Post to a channel when a webhook request is received"**. You can also do this in Power Automate with the trigger *When a Teams webhook request is received*.
 2. Choose the team and channel. Use standard channels; support for private channels is not guaranteed.
-3. Set **Who can trigger the flow** to **Specific users in my tenant** and add the **object ID of `func-voice`'s managed identity**:
-   - `az functionapp identity show -g <rg> -n func-rkjh-ai-prod-voice --query principalId -o tsv`
+3. Set **Who can trigger the flow** to **Specific users in my tenant** and add the **object IDs of the identities that post**:
+   - the media VM (urgent messages and booking cards from live calls): `az vm identity show -g <rg> -n vm-rkjh-ai-prod-media --query principalId -o tsv`
+   - `func-jobs` (post-call messages and the 5-minute sweep): `az functionapp identity show -g <rg> -n func-rkjh-ai-prod-jobs --query principalId -o tsv`
    - Add `func-dash`'s identity too, if you later post from the dashboard.
 4. Save and copy the HTTP POST URL.
 5. Add a **co-owner** to the flow (e.g. IT). Flows belong to a user and stop when that user leaves.
 
-With this setting `func-voice` sends an Entra token (`TEAMS_FLOW_AUTH=entra`, audience `https://service.flow.microsoft.com/`), so the URL alone is not enough to post. If you choose *Anyone*, set `TEAMS_FLOW_AUTH=none`; the URL's SAS signature is then the only protection.
+With this setting the media VM and `func-jobs` send an Entra token (`TEAMS_FLOW_AUTH=entra`, audience `https://service.flow.microsoft.com/`), so the URL alone is not enough to post. If you choose *Anyone*, set `TEAMS_FLOW_AUTH=none`; the URL's SAS signature is then the only protection.
 
 ## 2. Store the URL
 

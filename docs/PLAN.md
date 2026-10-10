@@ -455,3 +455,24 @@ Local dev: `func start` (Core Tools), Postgres in Docker, and a `devtunnel` (or 
 - **Teams:** cards are posted after the call ends, so they include the summary. High-urgency messages are posted immediately, and a 5-minute sweep catches anything missed.
 - **Knowledge base:** the retrieval mode is decided automatically after every crawl and every FAQ change. rkjh.se was unreachable from the build sandbox, so the real corpus size is still to be measured on the first production crawl.
 
+---
+
+## 15. Pivot: self-hosted LiveKit replaces Vapi (2026-10-10)
+
+The owner chose to build our own call engine once it was confirmed that Vapi charges a per-minute platform fee. Vapi was removed in commit `bcfb833`, and the LiveKit agent arrived in `c191b71`.
+
+**What changed**
+- **Call engine:** `agent/` (LiveKit Agents for Node 1.9.2), running on one media VM in Sweden Central with livekit-server and livekit/sip ([docs/livekit.md](livekit.md)). Twilio Elastic SIP Trunking replaces the Vapi number import.
+- **Shared core:** the tools, transfer approval, ingest, post-call analysis and prompt variables moved to `api/src/core` and are shared by the agent and the Functions apps.
+- **Functions:** `func-voice` became `func-jobs` (timers and admin only); nothing public faces Vapi any more.
+- **Language:** continuous sv/en language ID in Azure STT, with automatic agent hand-off instead of a model-triggered squad hand-off.
+- **Warm transfer:** done in the caller's room with subscription isolation and DTMF accept, because self-hosted LiveKit has no MoveParticipant. SIP REFER cold transfer is available as an option.
+- **Post-call analysis:** runs on our own Azure OpenAI (strict JSON schema) instead of Vapi structured outputs. No Vapi-side deletion is needed.
+- **Prompts:** moved to `/prompts` (v2, plain `{{var}}` templating).
+
+**GDPR effect:** Vapi (a US company) is gone as a sub-processor. Call audio and transcripts touch only Twilio (the PSTN leg) and Microsoft Azure in Sweden and the EU.
+
+**Cost effect:** no platform fee. Per-call cost is Azure Speech, Azure OpenAI and Twilio minutes, plus a fixed VM. The agent can record an estimate per call if unit prices are configured (`COST_*`).
+
+**New risks to verify in staging:** see the checklist at the end of [docs/livekit.md](livekit.md).
+
