@@ -48,6 +48,14 @@
   .ans .warn { margin-top: 6px; font-size: 13px; color: var(--warn); }
   .ans .meta { margin-top: 6px; font-size: 12px; color: var(--muted); }
   .ans.err { border-left-color: var(--danger); }
+  .ans .quick { font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; }
+  .ans .quick ul { margin: 6px 0 0; padding-left: 22px; }
+  .ans .tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 4px; padding: 1px 6px; margin-bottom: 4px; }
+  .ans .tag.fast { background: var(--hl); color: var(--warn); border: 1px solid var(--warn); }
+  .ans .tag.ok { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .ans.verified { border-left-color: var(--accent); }
+  .ans.pending { border-left-color: #f2b705; }
+  #err { color: var(--danger); font-size: 13px; margin-top: 6px; }
   #transcript { height: 62vh; min-height: 280px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
   #transcript .line { padding: 2px 0; border-bottom: 1px dashed var(--line); overflow-wrap: anywhere; }
   #transcript .line time { color: var(--muted); font-size: 12px; margin-right: 6px; }
@@ -92,6 +100,7 @@
         <span>Svar: <b id="count">0</b></span>
         <button id="clear" type="button" style="margin-left:auto;padding:3px 10px;font-size:13px">Rensa</button>
       </div>
+      <div id="err"></div>
     </section>
     <p class="empty" style="margin:10px 2px">Prototyp. Svar är underlag och kan vara fel – kontrollera siffror mot källan innan du citerar. Använd inte på riktiga kundsamtal ännu: ljudet går till Google (taligenkänning) och texten till Anthropic (USA). Inget sparas på servern.</p>
   </aside>
@@ -100,24 +109,34 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const STABLE_MS = 650;
+  const FINAL_MERGE_MS = 300;
   const lines = [];
   const answered = [];
   let rec = null;
   let active = false;
   let wakeLock = null;
   let interimEl = null;
+  let interimText = "";
+  let stableTimer = null;
+  let consumed = "";
   let pending = "";
-  let debounce = null;
-  let inflight = 0;
+  let mergeTimer = null;
+  let quickInflight = 0;
   let cost = 0;
   let count = 0;
 
   const now = () => new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const words = (s) => s.trim().split(/\s+/).filter(Boolean).length;
+  const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
 
   function setStatus(text, live) {
     $("status").textContent = text;
     $("dot").classList.toggle("live", !!live);
+  }
+
+  function showError(msg) {
+    $("err").textContent = msg ? `${now()} – ${msg}` : "";
   }
 
   function addCost(c) {
@@ -125,7 +144,7 @@
     $("cost").textContent = "$" + cost.toFixed(3);
   }
 
-  function contextText(maxChars = 5000) {
+  function contextText(maxChars = 3500) {
     let out = "";
     for (let i = lines.length - 1; i >= 0; i--) {
       const l = `[${lines[i].at}] ${lines[i].text}\n`;
@@ -185,49 +204,60 @@
           interim += r[0].transcript;
         }
       }
-      if (interim.trim()) showInterim(interim.trim()); else clearInterim();
+      interim = interim.trim();
+      if (interim) showInterim(interim); else clearInterim();
+      if (interim !== interimText) {
+        interimText = interim;
+        clearTimeout(stableTimer);
+        if (interim) stableTimer = setTimeout(onStableInterim, STABLE_MS);
+      }
     };
     rec.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
         stop();
         alert("Mikrofonen är blockerad. Tillåt mikrofon för sidan och försök igen.");
       } else if (e.error === "network") {
-        setStatus("Nätverksfel i taligenkänningen – försöker igen", true);
+        showError("Nätverksfel i taligenkänningen – försöker igen");
       }
     };
     rec.onend = () => {
       clearInterim();
-      if (active) setTimeout(() => { if (active) startRec(); }, 250);
+      interimText = "";
+      if (active) setTimeout(() => { if (active) startRec(); }, 150);
     };
     rec.start();
   }
 
-  function onFinal(text) {
-    const line = pushLine(text);
-    if (!$("auto").checked) return;
-    pending = (pending ? pending + " " : "") + text;
-    pending = pending.slice(-800);
-    clearTimeout(debounce);
-    debounce = setTimeout(() => detect(line), 1100);
+  function onStableInterim() {
+    if (!$("auto").checked || !interimText) return;
+    const fresh = consumed && interimText.startsWith(consumed) ? interimText.slice(consumed.length).trim() : interimText;
+    if (words(fresh) < 4) return;
+    consumed = interimText;
+    quick({ latest: fresh });
   }
 
-  async function detect(line) {
-    const latest = pending;
-    pending = "";
-    if (words(latest) < 3 || inflight >= 2) return;
-    try {
-      const r = await fetch("/api/detect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ context: contextText(3500), latest, answered }),
-      });
-      const d = await r.json();
-      addCost(d.costUsd);
-      if (d.needs_help && d.question) {
-        line?.el?.classList.add("flag");
-        ask({ mode: "question", question: d.question, context: contextText(3000) });
+  function onFinal(text) {
+    const line = pushLine(text);
+    clearTimeout(stableTimer);
+    let fresh = text;
+    if (consumed) {
+      const a = norm(consumed);
+      const b = norm(text);
+      if (b.startsWith(a.slice(0, Math.floor(a.length * 0.7)))) {
+        const extra = words(text) - words(consumed);
+        fresh = extra >= 4 ? text.split(/\s+/).slice(-extra).join(" ") : "";
       }
-    } catch {}
+      consumed = "";
+    }
+    if (!$("auto").checked || !fresh) return;
+    pending = (pending ? pending + " " : "") + fresh;
+    pending = pending.slice(-800);
+    clearTimeout(mergeTimer);
+    mergeTimer = setTimeout(() => {
+      const latest = pending;
+      pending = "";
+      if (words(latest) >= 3) quick({ latest, line });
+    }, FINAL_MERGE_MS);
   }
 
   function esc(s) {
@@ -253,111 +283,170 @@
     try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
   }
 
-  async function ask({ mode, question, context }) {
+  async function readNdjson(r, onEvent) {
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const raw = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        if (raw.trim()) onEvent(JSON.parse(raw));
+      }
+    }
+  }
+
+  function makeCard(question) {
     const list = $("answers");
     if (list.firstElementChild?.classList.contains("empty")) list.innerHTML = "";
-    if (question) answered.push(question);
-    if (answered.length > 20) answered.shift();
-
     const card = document.createElement("article");
-    card.className = "ans new";
+    card.className = "ans new pending";
     const q = document.createElement("div");
     q.className = "q";
     const qText = document.createElement("span");
-    qText.textContent = question || "Senaste frågan i samtalet…";
+    qText.textContent = question;
     const close = document.createElement("button");
     close.type = "button";
     close.textContent = "✕";
     close.title = "Ta bort";
     close.onclick = () => card.remove();
     q.append(qText, close);
+    const tag = document.createElement("div");
+    tag.className = "tag fast";
+    tag.textContent = "Snabbsvar – ej verifierat";
+    const quickEl = document.createElement("div");
+    quickEl.className = "quick";
     const status = document.createElement("div");
     status.className = "status";
-    status.textContent = "Tänker…";
+    status.textContent = "Verifierar med källor…";
     const body = document.createElement("div");
     body.className = "body";
     const src = document.createElement("div");
     src.className = "src";
     const meta = document.createElement("div");
     meta.className = "meta";
-    card.append(q, status, body, src, meta);
+    card.append(q, tag, quickEl, status, body, src, meta);
     list.prepend(card);
     setTimeout(() => card.classList.remove("new"), 1700);
+    return { card, qText, tag, quickEl, status, body, src, meta };
+  }
 
-    inflight++;
-    let text = "";
+  async function quick({ latest, line, mode, context }) {
+    if (quickInflight >= 3) return;
+    quickInflight++;
+    let ui = null;
+    let quickText = "";
     const started = performance.now();
+    try {
+      const r = await fetch("/api/quick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, latest, context: context ?? contextText(3000), answered }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${r.status}`);
+      }
+      if ((r.headers.get("content-type") || "").includes("application/json")) return;
+      await readNdjson(r, (ev) => {
+        if (ev.t === "q") {
+          const key = norm(ev.question);
+          if (mode !== "now" && answered.some((a) => norm(a) === key)) return;
+          answered.push(ev.question);
+          if (answered.length > 20) answered.shift();
+          line?.el?.classList.add("flag");
+          ui = makeCard(ev.question);
+          ui.started = started;
+          verify(ui, ev.question);
+        } else if (ev.t === "text" && ui) {
+          quickText += ev.d;
+          if (!ui.verifiedStarted) ui.quickEl.innerHTML = renderBody(quickText);
+        } else if (ev.t === "error") {
+          throw new Error(ev.error);
+        }
+      });
+      if (ui) ui.quickMs = performance.now() - started;
+      showError("");
+    } catch (e) {
+      showError("Snabbsvar: " + e.message);
+    } finally {
+      quickInflight--;
+    }
+  }
+
+  async function verify(ui, question) {
+    let text = "";
     try {
       const r = await fetch("/api/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, question, context }),
+        body: JSON.stringify({ mode: "question", question, context: contextText(2500) }),
       });
       if (!r.ok || !r.body) {
         const d = await r.json().catch(() => ({}));
         throw new Error(d.error || `HTTP ${r.status}`);
       }
-      const reader = r.body.getReader();
-      const dec = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += dec.decode(value, { stream: true });
-        let nl;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const raw = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (!raw.trim()) continue;
-          const ev = JSON.parse(raw);
-          if (ev.t === "status" && ev.s === "searching") status.textContent = "Söker i källor…";
-          else if (ev.t === "text") {
-            text += ev.d;
-            let shown = text;
-            if (mode === "now") {
-              const m = shown.match(/^\s*\[([^\]\n]{3,300})\]\s*\n?/);
-              if (m) { qText.textContent = m[1]; shown = shown.slice(m[0].length); }
-            }
-            status.textContent = "";
-            body.innerHTML = renderBody(shown);
-          } else if (ev.t === "done") {
-            status.textContent = "";
-            addCost(ev.costUsd);
-            count++;
-            $("count").textContent = count;
-            for (const s of ev.sources.slice(0, 5)) {
-              const a = document.createElement("a");
-              a.href = s.url;
-              a.target = "_blank";
-              a.rel = "noopener noreferrer";
-              a.textContent = hostOf(s.url);
-              a.title = s.title;
-              src.appendChild(a);
-            }
-            const secs = ((performance.now() - started) / 1000).toFixed(1);
-            meta.textContent = `${secs} s · ${ev.searches} sökning${ev.searches === 1 ? "" : "ar"} · $${ev.costUsd.toFixed(3)}`;
-            if (/\d/.test(text) && ev.citedCount === 0) {
-              const w = document.createElement("div");
-              w.className = "warn";
-              w.textContent = ev.sources.length ? "⚠ Siffror utan direkt citerad källa – kontrollera innan du använder dem." : "⚠ Ingen källa hittades – kontrollera innan du använder siffrorna.";
-              card.insertBefore(w, meta);
-            }
-          } else if (ev.t === "error") {
-            throw new Error(ev.error);
+      await readNdjson(r, (ev) => {
+        if (ev.t === "status" && ev.s === "searching") ui.status.textContent = "Söker i källor…";
+        else if (ev.t === "text") {
+          text += ev.d;
+          if (!ui.verifiedStarted) {
+            ui.verifiedStarted = true;
+            ui.quickEl.remove();
+            ui.tag.className = "tag ok";
+            ui.tag.textContent = "Verifierat med källor";
+            ui.card.classList.remove("pending");
+            ui.card.classList.add("verified");
           }
+          ui.status.textContent = "";
+          ui.body.innerHTML = renderBody(text);
+        } else if (ev.t === "done") {
+          ui.status.textContent = "";
+          addCost(ev.costUsd);
+          count++;
+          $("count").textContent = count;
+          for (const s of ev.sources.slice(0, 5)) {
+            const a = document.createElement("a");
+            a.href = s.url;
+            a.target = "_blank";
+            a.rel = "noopener noreferrer";
+            a.textContent = hostOf(s.url);
+            a.title = s.title;
+            ui.src.appendChild(a);
+          }
+          const q = ui.quickMs ? `snabbsvar ${(ui.quickMs / 1000).toFixed(1)} s · ` : "";
+          const v = ((performance.now() - ui.started) / 1000).toFixed(1);
+          ui.meta.textContent = `${q}verifierat ${v} s · ${ev.searches} sökning${ev.searches === 1 ? "" : "ar"} · $${ev.costUsd.toFixed(3)}`;
+          if (/\d/.test(text) && ev.citedCount === 0) {
+            const w = document.createElement("div");
+            w.className = "warn";
+            w.textContent = ev.sources.length ? "⚠ Siffror utan direkt citerad källa – kontrollera innan du använder dem." : "⚠ Ingen källa hittades – kontrollera innan du använder siffrorna.";
+            ui.card.insertBefore(w, ui.meta);
+          }
+        } else if (ev.t === "error") {
+          throw new Error(ev.error);
         }
-      }
+      });
     } catch (e) {
-      card.classList.add("err");
-      status.textContent = "Fel: " + e.message;
-    } finally {
-      inflight--;
+      ui.card.classList.add("err");
+      ui.status.textContent = "Verifiering misslyckades: " + e.message + (ui.verifiedStarted ? "" : " – snabbsvaret ovan är inte kontrollerat.");
+    }
+  }
+
+  function warm() {
+    for (const u of ["/api/quick", "/api/assist"]) {
+      fetch(u, { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"warm":true}' }).catch(() => {});
     }
   }
 
   async function start() {
     if (!SR) { alert("Den här webbläsaren saknar taligenkänning. Använd Chrome eller Edge."); return; }
     active = true;
+    warm();
     $("toggle").textContent = "■ Stoppa";
     $("toggle").className = "stop";
     setStatus("Lyssnar", true);
@@ -367,8 +456,11 @@
 
   function stop() {
     active = false;
+    clearTimeout(stableTimer);
     if (rec) { try { rec.stop(); } catch {} rec = null; }
     clearInterim();
+    interimText = "";
+    consumed = "";
     $("toggle").textContent = "▶ Starta lyssning";
     $("toggle").className = "primary";
     setStatus("Av", false);
@@ -377,9 +469,10 @@
   }
 
   function helpNow() {
-    const ctx = recentContext(75) || contextText(2500);
-    if (!ctx) { alert("Inget transkriberat ännu."); return; }
-    ask({ mode: "now", context: ctx });
+    let ctx = recentContext(75) || contextText(2500);
+    if (interimText) ctx += `\n[${now()}] ${interimText}`;
+    if (!ctx.trim()) { alert("Inget transkriberat ännu."); return; }
+    quick({ mode: "now", context: ctx });
   }
 
   $("toggle").onclick = () => (active ? stop() : start());
@@ -390,13 +483,14 @@
     const v = $("q").value.trim();
     if (!v) return;
     $("q").value = "";
-    ask({ mode: "question", question: v, context: contextText(2000) });
+    quick({ mode: "now", context: `${contextText(2000)}\n[${now()}] Rådgivaren frågar: ${v}` });
   };
   $("clear").onclick = () => {
     lines.length = 0;
     answered.length = 0;
     $("transcript").innerHTML = '<div class="empty">Ingenting ännu.</div>';
     $("answers").innerHTML = "";
+    showError("");
   };
   document.addEventListener("keydown", (e) => {
     if (e.code === "Space" && !["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(document.activeElement?.tagName)) {
@@ -409,6 +503,7 @@
       try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
     }
   });
+  warm();
 })();
 </script>
 </body>

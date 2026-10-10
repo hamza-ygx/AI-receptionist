@@ -11,8 +11,9 @@
       "maxDuration": 60,
       "includeFiles": "api/_data.json"
     },
-    "api/detect.js": {
-      "maxDuration": 20
+    "api/quick.js": {
+      "maxDuration": 30,
+      "includeFiles": "api/_data.json"
     }
   },
   "headers": [

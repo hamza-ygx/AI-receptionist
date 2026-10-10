@@ -28,7 +28,9 @@ Test data only. Requests go to Anthropic's API (US processing), unlike productio
 
 Listens through the laptop mic while you take a call on speaker, transcribes it, and shows short sourced answers to questions as they come up.
 
-- `api/detect.js`: Haiku (`COPILOT_DETECT_MODEL`) decides if the latest utterance needs an answer and rewrites it as a standalone question (structured output).
-- `api/assist.js`: Opus (`COPILOT_MODEL`, effort `COPILOT_EFFORT`) answers with web search limited to official domains (Skatteverket, Bolagsverket, skat.dk, …), streamed as NDJSON with cited sources.
+- Triggers on speech that has stopped changing for 650 ms, before the browser finalises it.
+- `api/quick.js`: Haiku (`COPILOT_QUICK_MODEL`, thinking off) decides in one streamed call whether the latest utterance is a question (`INGEN` or `F: …`) and gives an unverified quick answer from its own knowledge, shown within about a second and labelled as such.
+- `api/assist.js`: Sonnet (`COPILOT_MODEL`, effort `COPILOT_EFFORT`, thinking `between_tools`) starts as soon as the question is known, answers with web search limited to official domains (Skatteverket, Bolagsverket, skat.dk, …) and replaces the quick answer, with cited sources.
+- Both functions are warmed on page load and on Start to avoid cold starts.
 - "Hjälp mig nu" (or space) answers the latest question from the last ~75 s of transcript.
 - Prototype only: speech recognition is the browser's (Google in Chrome), LLM is Anthropic (US). No real client calls until it runs on Azure Speech + an EU model.

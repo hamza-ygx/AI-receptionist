@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
 
 const DATA = JSON.parse(readFileSync(new URL("./_data.json", import.meta.url), "utf8"));
-const MODEL = process.env.COPILOT_MODEL || "claude-opus-5-5";
+const MODEL = process.env.COPILOT_MODEL || "claude-sonnet-5-5";
 const EFFORT = process.env.COPILOT_EFFORT || "low";
 const PRICE = { "claude-opus-5-5": [4, 20], "claude-sonnet-5-5": [2, 10], "claude-haiku-5-5": [0.1, 0.5] };
 const SEARCH_USD = 0.01;
@@ -32,7 +32,7 @@ Dagens datum: ${today}.
 - Svara på samma språk som frågan.
 
 # Källor och siffror
-- Använd webbsökningen för allt som gäller regler, skattesatser, belopp, avgifter, deadlines, andra länder och jämförelser. Lita inte på ditt eget minne för sådant.
+- Gör helst en enda riktad sökning (högst två). Använd webbsökningen för allt som gäller regler, skattesatser, belopp, avgifter, deadlines, andra länder och jämförelser. Lita inte på ditt eget minne för sådant.
 - Ange bara siffror som står i en källa du hittat nu, och skriv vilket år eller inkomstår de gäller.
 - Om källorna är otydliga, gamla eller motsäger varandra: säg det kort.
 - Om du inte hittar någon säker källa: skriv "Hittade ingen säker källa" och vad rådgivaren kan säga i stället (t.ex. att återkomma).
@@ -62,9 +62,10 @@ function collectSources(content, cited, found) {
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: "missing_api_key" });
+  if (!process.env.ANTHROPIC_API_KEY && !(req.body && req.body.warm)) return res.status(503).json({ error: "missing_api_key" });
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
+  if (body.warm) return res.status(204).end();
   const mode = body.mode === "now" ? "now" : "question";
   const question = typeof body.question === "string" ? body.question.trim().slice(0, 500) : "";
   const context = typeof body.context === "string" ? body.context.slice(-6000) : "";
@@ -93,11 +94,12 @@ export default async function handler(req, res) {
         tools: [{
           type: "web_search_20260209",
           name: "web_search",
-          max_uses: 3,
+          max_uses: 2,
           allowed_domains: ALLOWED_DOMAINS,
           user_location: { type: "approximate", country: "SE", city: "Halmstad", timezone: "Europe/Stockholm" },
         }],
         output_config: { effort: EFFORT },
+        ...(MODEL.startsWith("claude-sonnet-5-5") ? { thinking: { type: "between_tools" } } : {}),
         messages,
       };
       if (!MODEL.startsWith("claude-haiku")) {
