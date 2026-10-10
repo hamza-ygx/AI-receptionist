@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Samtalsstöd – RKJH</title>
+<style>
+  :root {
+    --bg: #f4f6f8; --panel: #ffffff; --ink: #1b2430; --muted: #5d6b7a; --line: #dfe4ea;
+    --brand: #0f3d5e; --brand-ink: #ffffff; --accent: #1f7a5a; --warn: #8a5a00; --danger: #b3261e;
+    --hl: #fff6d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161c; --panel: #18202a; --ink: #e6ebf0; --muted: #9aa7b4; --line: #2a3542;
+      --brand: #5fa8d8; --brand-ink: #0b1218; --accent: #4cc39a; --warn: #e0b04a; --danger: #f2817a;
+      --hl: #2c2a1c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--brand); color: var(--brand-ink); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; position: sticky; top: 0; z-index: 2; }
+  header h1 { margin: 0 auto 0 0; font-size: 16px; font-weight: 600; }
+  button, select { font: inherit; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 8px 14px; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.stop { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+  button.help { background: #f2b705; border-color: #f2b705; color: #1b2430; font-weight: 700; padding: 10px 18px; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  label { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  main { max-width: 1300px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr) 360px; }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  h2 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  #answers { display: flex; flex-direction: column; gap: 12px; }
+  .ans { background: var(--panel); border: 1px solid var(--line); border-left: 5px solid var(--accent); border-radius: 10px; padding: 14px 16px; }
+  .ans.new { animation: flash 1.6s ease-out; }
+  @keyframes flash { from { background: var(--hl); } to { background: var(--panel); } }
+  .ans .q { font-size: 14px; color: var(--muted); margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; }
+  .ans .q span { flex: 1; }
+  .ans .q button { padding: 2px 8px; font-size: 12px; }
+  .ans .body { font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; }
+  .ans .body ul { margin: 6px 0 0; padding-left: 22px; }
+  .ans .body li { margin: 2px 0; }
+  .ans .status { font-size: 13px; color: var(--muted); font-style: italic; }
+  .ans .src { margin-top: 8px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+  .ans .src a { color: var(--brand); }
+  .ans .warn { margin-top: 6px; font-size: 13px; color: var(--warn); }
+  .ans .meta { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .ans.err { border-left-color: var(--danger); }
+  #transcript { height: 62vh; min-height: 280px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+  #transcript .line { padding: 2px 0; border-bottom: 1px dashed var(--line); overflow-wrap: anywhere; }
+  #transcript .line time { color: var(--muted); font-size: 12px; margin-right: 6px; }
+  #transcript .interim { color: var(--muted); font-style: italic; }
+  #transcript .flag { background: var(--hl); }
+  form { display: flex; gap: 8px; margin-bottom: 12px; }
+  input[type=text] { flex: 1; min-width: 0; font: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  .empty { color: var(--muted); font-size: 14px; }
+  .meta-row { font-size: 13px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #9aa7b4; margin-right: 6px; vertical-align: middle; }
+  .dot.live { background: #ff5a4f; animation: pulse 1.2s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Samtalsstöd <span style="opacity:.75;font-weight:400">– prototyp</span></h1>
+  <span><span class="dot" id="dot"></span><span id="status">Av</span></span>
+  <select id="lang" title="Samtalets språk">
+    <option value="sv-SE">Svenska</option>
+    <option value="en-US">English</option>
+  </select>
+  <label style="color:inherit"><input type="checkbox" id="auto" checked> Auto-svar</label>
+  <button class="primary" id="toggle">▶ Starta lyssning</button>
+  <button class="help" id="help" title="Svara på senaste frågan (mellanslag)">Hjälp mig nu</button>
+</header>
+<main>
+  <section>
+    <form id="ask">
+      <input type="text" id="q" placeholder="Skriv en egen fråga…" autocomplete="off">
+      <button type="submit">Fråga</button>
+    </form>
+    <div id="answers"><div class="empty card">Starta lyssning och lägg samtalet på högtalare nära datorn. Frågor som dyker upp i samtalet får svar här, med källor. Tryck <b>Hjälp mig nu</b> (eller <kbd>mellanslag</kbd>) om du behöver ett svar direkt.</div></div>
+  </section>
+  <aside>
+    <section class="card">
+      <h2>Transkribering</h2>
+      <div id="transcript"><div class="empty">Ingenting ännu.</div></div>
+      <div class="meta-row">
+        <span>Kostnad: <b id="cost">$0.000</b></span>
+        <span>Svar: <b id="count">0</b></span>
+        <button id="clear" type="button" style="margin-left:auto;padding:3px 10px;font-size:13px">Rensa</button>
+      </div>
+    </section>
+    <p class="empty" style="margin:10px 2px">Prototyp. Svar är underlag och kan vara fel – kontrollera siffror mot källan innan du citerar. Använd inte på riktiga kundsamtal ännu: ljudet går till Google (taligenkänning) och texten till Anthropic (USA). Inget sparas på servern.</p>
+  </aside>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const lines = [];
+  const answered = [];
+  let rec = null;
+  let active = false;
+  let wakeLock = null;
+  let interimEl = null;
+  let pending = "";
+  let debounce = null;
+  let inflight = 0;
+  let cost = 0;
+  let count = 0;
+
+  const now = () => new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const words = (s) => s.trim().split(/\s+/).filter(Boolean).length;
+
+  function setStatus(text, live) {
+    $("status").textContent = text;
+    $("dot").classList.toggle("live", !!live);
+  }
+
+  function addCost(c) {
+    cost += c || 0;
+    $("cost").textContent = "$" + cost.toFixed(3);
+  }
+
+  function contextText(maxChars = 5000) {
+    let out = "";
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const l = `[${lines[i].at}] ${lines[i].text}\n`;
+      if (out.length + l.length > maxChars) break;
+      out = l + out;
+    }
+    return out.trim();
+  }
+
+  function recentContext(seconds) {
+    const cutoff = Date.now() - seconds * 1000;
+    return lines.filter((l) => l.ts >= cutoff).map((l) => `[${l.at}] ${l.text}`).join("\n");
+  }
+
+  function pushLine(text) {
+    const t = $("transcript");
+    if (t.firstElementChild?.classList.contains("empty")) t.innerHTML = "";
+    const line = { at: now(), ts: Date.now(), text };
+    lines.push(line);
+    if (lines.length > 400) lines.shift();
+    const el = document.createElement("div");
+    el.className = "line";
+    const time = document.createElement("time");
+    time.textContent = line.at;
+    el.append(time, document.createTextNode(text));
+    line.el = el;
+    if (interimEl) t.insertBefore(el, interimEl); else t.appendChild(el);
+    t.scrollTop = t.scrollHeight;
+    return line;
+  }
+
+  function showInterim(text) {
+    const t = $("transcript");
+    if (t.firstElementChild?.classList.contains("empty")) t.innerHTML = "";
+    if (!interimEl) { interimEl = document.createElement("div"); interimEl.className = "line interim"; t.appendChild(interimEl); }
+    interimEl.textContent = text;
+    t.scrollTop = t.scrollHeight;
+  }
+
+  function clearInterim() {
+    if (interimEl) { interimEl.remove(); interimEl = null; }
+  }
+
+  function startRec() {
+    rec = new SR();
+    rec.lang = $("lang").value;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const text = r[0].transcript.trim();
+          if (text) onFinal(text);
+        } else {
+          interim += r[0].transcript;
+        }
+      }
+      if (interim.trim()) showInterim(interim.trim()); else clearInterim();
+    };
+    rec.onerror = (e) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        stop();
+        alert("Mikrofonen är blockerad. Tillåt mikrofon för sidan och försök igen.");
+      } else if (e.error === "network") {
+        setStatus("Nätverksfel i taligenkänningen – försöker igen", true);
+      }
+    };
+    rec.onend = () => {
+      clearInterim();
+      if (active) setTimeout(() => { if (active) startRec(); }, 250);
+    };
+    rec.start();
+  }
+
+  function onFinal(text) {
+    const line = pushLine(text);
+    if (!$("auto").checked) return;
+    pending = (pending ? pending + " " : "") + text;
+    pending = pending.slice(-800);
+    clearTimeout(debounce);
+    debounce = setTimeout(() => detect(line), 1100);
+  }
+
+  async function detect(line) {
+    const latest = pending;
+    pending = "";
+    if (words(latest) < 3 || inflight >= 2) return;
+    try {
+      const r = await fetch("/api/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: contextText(3500), latest, answered }),
+      });
+      const d = await r.json();
+      addCost(d.costUsd);
+      if (d.needs_help && d.question) {
+        line?.el?.classList.add("flag");
+        ask({ mode: "question", question: d.question, context: contextText(3000) });
+      }
+    } catch {}
+  }
+
+  function esc(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderBody(text) {
+    const out = [];
+    let list = [];
+    const inline = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    for (const raw of text.split("\n")) {
+      const l = raw.trim();
+      if (!l) continue;
+      if (/^[-•*]\s+/.test(l)) { list.push(`<li>${inline(l.replace(/^[-•*]\s+/, ""))}</li>`); continue; }
+      if (list.length) { out.push(`<ul>${list.join("")}</ul>`); list = []; }
+      out.push(`<div>${inline(l)}</div>`);
+    }
+    if (list.length) out.push(`<ul>${list.join("")}</ul>`);
+    return out.join("");
+  }
+
+  function hostOf(u) {
+    try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+  }
+
+  async function ask({ mode, question, context }) {
+    const list = $("answers");
+    if (list.firstElementChild?.classList.contains("empty")) list.innerHTML = "";
+    if (question) answered.push(question);
+    if (answered.length > 20) answered.shift();
+
+    const card = document.createElement("article");
+    card.className = "ans new";
+    const q = document.createElement("div");
+    q.className = "q";
+    const qText = document.createElement("span");
+    qText.textContent = question || "Senaste frågan i samtalet…";
+    const close = document.createElement("button");
+    close.type = "button";
+    close.textContent = "✕";
+    close.title = "Ta bort";
+    close.onclick = () => card.remove();
+    q.append(qText, close);
+    const status = document.createElement("div");
+    status.className = "status";
+    status.textContent = "Tänker…";
+    const body = document.createElement("div");
+    body.className = "body";
+    const src = document.createElement("div");
+    src.className = "src";
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    card.append(q, status, body, src, meta);
+    list.prepend(card);
+    setTimeout(() => card.classList.remove("new"), 1700);
+
+    inflight++;
+    let text = "";
+    const started = performance.now();
+    try {
+      const r = await fetch("/api/assist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode, question, context }),
+      });
+      if (!r.ok || !r.body) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${r.status}`);
+      }
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const raw = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          if (!raw.trim()) continue;
+          const ev = JSON.parse(raw);
+          if (ev.t === "status" && ev.s === "searching") status.textContent = "Söker i källor…";
+          else if (ev.t === "text") {
+            text += ev.d;
+            let shown = text;
+            if (mode === "now") {
+              const m = shown.match(/^\s*\[([^\]\n]{3,300})\]\s*\n?/);
+              if (m) { qText.textContent = m[1]; shown = shown.slice(m[0].length); }
+            }
+            status.textContent = "";
+            body.innerHTML = renderBody(shown);
+          } else if (ev.t === "done") {
+            status.textContent = "";
+            addCost(ev.costUsd);
+            count++;
+            $("count").textContent = count;
+            for (const s of ev.sources.slice(0, 5)) {
+              const a = document.createElement("a");
+              a.href = s.url;
+              a.target = "_blank";
+              a.rel = "noopener noreferrer";
+              a.textContent = hostOf(s.url);
+              a.title = s.title;
+              src.appendChild(a);
+            }
+            const secs = ((performance.now() - started) / 1000).toFixed(1);
+            meta.textContent = `${secs} s · ${ev.searches} sökning${ev.searches === 1 ? "" : "ar"} · $${ev.costUsd.toFixed(3)}`;
+            if (/\d/.test(text) && ev.citedCount === 0) {
+              const w = document.createElement("div");
+              w.className = "warn";
+              w.textContent = ev.sources.length ? "⚠ Siffror utan direkt citerad källa – kontrollera innan du använder dem." : "⚠ Ingen källa hittades – kontrollera innan du använder siffrorna.";
+              card.insertBefore(w, meta);
+            }
+          } else if (ev.t === "error") {
+            throw new Error(ev.error);
+          }
+        }
+      }
+    } catch (e) {
+      card.classList.add("err");
+      status.textContent = "Fel: " + e.message;
+    } finally {
+      inflight--;
+    }
+  }
+
+  async function start() {
+    if (!SR) { alert("Den här webbläsaren saknar taligenkänning. Använd Chrome eller Edge."); return; }
+    active = true;
+    $("toggle").textContent = "■ Stoppa";
+    $("toggle").className = "stop";
+    setStatus("Lyssnar", true);
+    try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+    startRec();
+  }
+
+  function stop() {
+    active = false;
+    if (rec) { try { rec.stop(); } catch {} rec = null; }
+    clearInterim();
+    $("toggle").textContent = "▶ Starta lyssning";
+    $("toggle").className = "primary";
+    setStatus("Av", false);
+    try { wakeLock?.release(); } catch {}
+    wakeLock = null;
+  }
+
+  function helpNow() {
+    const ctx = recentContext(75) || contextText(2500);
+    if (!ctx) { alert("Inget transkriberat ännu."); return; }
+    ask({ mode: "now", context: ctx });
+  }
+
+  $("toggle").onclick = () => (active ? stop() : start());
+  $("help").onclick = helpNow;
+  $("lang").onchange = () => { if (active) { stop(); start(); } };
+  $("ask").onsubmit = (e) => {
+    e.preventDefault();
+    const v = $("q").value.trim();
+    if (!v) return;
+    $("q").value = "";
+    ask({ mode: "question", question: v, context: contextText(2000) });
+  };
+  $("clear").onclick = () => {
+    lines.length = 0;
+    answered.length = 0;
+    $("transcript").innerHTML = '<div class="empty">Ingenting ännu.</div>';
+    $("answers").innerHTML = "";
+  };
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(document.activeElement?.tagName)) {
+      e.preventDefault();
+      helpNow();
+    }
+  });
+  document.addEventListener("visibilitychange", async () => {
+    if (active && document.visibilityState === "visible" && !wakeLock) {
+      try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
+    }
+  });
+})();
+</script>
+</body>
+</html>
