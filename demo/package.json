@@ -1,0 +1,14 @@
+{
+  "name": "rkjh-receptionist-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/build-data.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.133.0"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}

@@ -1,0 +1,23 @@
+# Browser demo (Vercel)
+
+A talk-to-it demo of the receptionist for testing persona, guardrails and tool flow. **Not the production stack** (that is LiveKit + Twilio + Azure, see `docs/livekit.md`).
+
+- Speech: browser Web Speech API (recognition + synthesis), half-duplex. Chrome/Edge.
+- LLM: Claude via `@anthropic-ai/sdk` (`DEMO_MODEL`, default `claude-opus-5-5`, effort `DEMO_EFFORT`=`low`), server-side refusal fallback enabled.
+- Prompt: the real `prompts/*/system.v2.md` and `config/*.yaml`, rendered with demo values. Language switch appends the other-language prompt as a mid-conversation system message.
+- Tools are mocks with the production names and guardrails: fake staff (Anna → transfer connects, Erik → busy, Jörgen → not transferable), deterministic fake calendar, simulated bookings/messages. No holidays.
+- Conversation state lives in the browser and is sent with every request (append-only, thinking blocks echoed unchanged). Nothing is stored server-side.
+
+## Env vars (Vercel project)
+
+| Var | |
+|---|---|
+| `ANTHROPIC_API_KEY` | required |
+| `DEMO_ACCESS_CODE` | optional gate; send as `?code=` once or enter in the UI |
+| `DEMO_MODEL` / `DEMO_EFFORT` / `DEMO_ASSISTANT_NAME` | optional |
+
+## Data
+`api/_data.json` is generated from `config/` and `prompts/`: `node demo/scripts/build-data.mjs` (needs the root `node_modules` for `yaml`).
+
+## Privacy
+Test data only. Requests go to Anthropic's API (US processing), unlike production which stays in the EU.
