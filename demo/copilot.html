@@ -109,8 +109,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const STABLE_MS = 650;
-  const FINAL_MERGE_MS = 300;
+  const STABLE_Q_MS = 280;
+  const STABLE_MS = 600;
+  const FINAL_MERGE_MS = 120;
+  const QWORDS = /(^|\s)(vad|vilken|vilket|vilka|hur|när|var|varför|vem|kan|får|måste|ska|skall|behöver|gäller|finns|stämmer|är det|what|which|how|when|where|why|who|can|could|do|does|is|are|should|must)(\s|$)/i;
+  const SMALLTALK = /\b(hur (är|var) läget|hur mår (du|ni)|hur (går|gick) det|hur har (du|ni) det|kan du höra mig|hör du mig|how are you|how's it going|can you hear me)\b/i;
+  const looksLikeQuestion = (t) => !SMALLTALK.test(t) && (QWORDS.test(t) || /\?\s*$/.test(t));
   const lines = [];
   const answered = [];
   let rec = null;
@@ -123,6 +127,7 @@
   let pending = "";
   let mergeTimer = null;
   let quickInflight = 0;
+  let specJob = null;
   let cost = 0;
   let count = 0;
 
@@ -209,7 +214,7 @@
       if (interim !== interimText) {
         interimText = interim;
         clearTimeout(stableTimer);
-        if (interim) stableTimer = setTimeout(onStableInterim, STABLE_MS);
+        if (interim) stableTimer = setTimeout(onStableInterim, looksLikeQuestion(interim) && words(interim) >= 4 ? STABLE_Q_MS : STABLE_MS);
       }
     };
     rec.onerror = (e) => {
@@ -230,10 +235,19 @@
 
   function onStableInterim() {
     if (!$("auto").checked || !interimText) return;
-    const fresh = consumed && interimText.startsWith(consumed) ? interimText.slice(consumed.length).trim() : interimText;
-    if (words(fresh) < 4) return;
+    const grown = consumed && interimText.startsWith(consumed) ? interimText.slice(consumed.length).trim() : interimText;
+    if (!grown) return;
+    let latest;
+    if (specJob && !specJob.ui) {
+      specJob.cancel();
+      latest = interimText;
+      if (words(latest) < 4) return;
+    } else {
+      latest = grown;
+      if (words(latest) < 4) return;
+    }
     consumed = interimText;
-    quick({ latest: fresh });
+    specJob = handle({ latest });
   }
 
   function onFinal(text) {
@@ -249,6 +263,7 @@
       }
       consumed = "";
     }
+    specJob = null;
     if (!$("auto").checked || !fresh) return;
     pending = (pending ? pending + " " : "") + fresh;
     pending = pending.slice(-800);
@@ -256,7 +271,7 @@
     mergeTimer = setTimeout(() => {
       const latest = pending;
       pending = "";
-      if (words(latest) >= 3) quick({ latest, line });
+      if (words(latest) >= 3) handle({ latest, line });
     }, FINAL_MERGE_MS);
   }
 
@@ -335,105 +350,150 @@
     return { card, qText, tag, quickEl, status, body, src, meta };
   }
 
-  async function quick({ latest, line, mode, context }) {
-    if (quickInflight >= 3) return;
+  function handle({ latest, line, mode, context }) {
+    const ctx = context ?? contextText(3000);
+    const job = { ui: null, buffered: [], qCtl: new AbortController(), vCtl: null, cancelled: false };
+    job.cancel = () => {
+      job.cancelled = true;
+      job.qCtl.abort();
+      job.vCtl?.abort();
+    };
+    if (mode !== "now" && latest && looksLikeQuestion(latest)) {
+      job.vCtl = new AbortController();
+      runVerify(job, { mode: "utterance", latest, context: contextText(2500) });
+    }
+    runQuick(job, { latest, line, mode, context: ctx });
+    return job;
+  }
+
+  function attachCard(job, question, line) {
+    line?.el?.classList.add("flag");
+    job.ui = makeCard(question);
+    job.ui.started = job.started;
+    job.ui.vState = { text: "" };
+    if (!job.vCtl) {
+      job.vCtl = new AbortController();
+      runVerify(job, { mode: "question", question, context: contextText(2500) });
+    } else {
+      for (const ev of job.buffered) applyVerify(job.ui, ev);
+      job.buffered = [];
+      if (job.vError) failVerify(job.ui, job.vError);
+    }
+  }
+
+  async function runQuick(job, { latest, line, mode, context }) {
+    if (quickInflight >= 4) { job.vCtl?.abort(); return; }
     quickInflight++;
-    let ui = null;
+    job.started = performance.now();
     let quickText = "";
-    const started = performance.now();
+    let decided = false;
     try {
       const r = await fetch("/api/quick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, latest, context: context ?? contextText(3000), answered }),
+        body: JSON.stringify({ mode, latest, context, answered }),
+        signal: job.qCtl.signal,
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         throw new Error(d.error || `HTTP ${r.status}`);
       }
-      if ((r.headers.get("content-type") || "").includes("application/json")) return;
+      if ((r.headers.get("content-type") || "").includes("application/json")) { job.vCtl?.abort(); return; }
       await readNdjson(r, (ev) => {
         if (ev.t === "q") {
+          decided = true;
           const key = norm(ev.question);
-          if (mode !== "now" && answered.some((a) => norm(a) === key)) return;
+          if (mode !== "now" && answered.some((a) => norm(a) === key)) { job.vCtl?.abort(); return; }
           answered.push(ev.question);
           if (answered.length > 20) answered.shift();
-          line?.el?.classList.add("flag");
-          ui = makeCard(ev.question);
-          ui.started = started;
-          verify(ui, ev.question);
-        } else if (ev.t === "text" && ui) {
+          attachCard(job, ev.question, line);
+        } else if (ev.t === "none") {
+          decided = true;
+          job.vCtl?.abort();
+        } else if (ev.t === "text" && job.ui) {
           quickText += ev.d;
-          if (!ui.verifiedStarted) ui.quickEl.innerHTML = renderBody(quickText);
+          if (!job.ui.verifiedStarted) job.ui.quickEl.innerHTML = renderBody(quickText);
         } else if (ev.t === "error") {
           throw new Error(ev.error);
         }
       });
-      if (ui) ui.quickMs = performance.now() - started;
+      if (!decided) job.vCtl?.abort();
+      if (job.ui) job.ui.quickMs = performance.now() - job.started;
       showError("");
     } catch (e) {
-      showError("Snabbsvar: " + e.message);
+      if (e.name !== "AbortError") { showError("Snabbsvar: " + e.message); job.vCtl?.abort(); }
     } finally {
       quickInflight--;
     }
   }
 
-  async function verify(ui, question) {
-    let text = "";
+  async function runVerify(job, payload) {
     try {
       const r = await fetch("/api/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "question", question, context: contextText(2500) }),
+        body: JSON.stringify(payload),
+        signal: job.vCtl.signal,
       });
       if (!r.ok || !r.body) {
         const d = await r.json().catch(() => ({}));
         throw new Error(d.error || `HTTP ${r.status}`);
       }
       await readNdjson(r, (ev) => {
-        if (ev.t === "status" && ev.s === "searching") ui.status.textContent = "Söker i källor…";
-        else if (ev.t === "text") {
-          text += ev.d;
-          if (!ui.verifiedStarted) {
-            ui.verifiedStarted = true;
-            ui.quickEl.remove();
-            ui.tag.className = "tag ok";
-            ui.tag.textContent = "Verifierat med källor";
-            ui.card.classList.remove("pending");
-            ui.card.classList.add("verified");
-          }
-          ui.status.textContent = "";
-          ui.body.innerHTML = renderBody(text);
-        } else if (ev.t === "done") {
-          ui.status.textContent = "";
-          addCost(ev.costUsd);
-          count++;
-          $("count").textContent = count;
-          for (const s of ev.sources.slice(0, 5)) {
-            const a = document.createElement("a");
-            a.href = s.url;
-            a.target = "_blank";
-            a.rel = "noopener noreferrer";
-            a.textContent = hostOf(s.url);
-            a.title = s.title;
-            ui.src.appendChild(a);
-          }
-          const q = ui.quickMs ? `snabbsvar ${(ui.quickMs / 1000).toFixed(1)} s · ` : "";
-          const v = ((performance.now() - ui.started) / 1000).toFixed(1);
-          ui.meta.textContent = `${q}verifierat ${v} s · ${ev.searches} sökning${ev.searches === 1 ? "" : "ar"} · $${ev.costUsd.toFixed(3)}`;
-          if (/\d/.test(text) && ev.citedCount === 0) {
-            const w = document.createElement("div");
-            w.className = "warn";
-            w.textContent = ev.sources.length ? "⚠ Siffror utan direkt citerad källa – kontrollera innan du använder dem." : "⚠ Ingen källa hittades – kontrollera innan du använder siffrorna.";
-            ui.card.insertBefore(w, ui.meta);
-          }
-        } else if (ev.t === "error") {
-          throw new Error(ev.error);
-        }
+        if (ev.t === "error") throw new Error(ev.error);
+        if (job.ui) applyVerify(job.ui, ev); else job.buffered.push(ev);
       });
     } catch (e) {
-      ui.card.classList.add("err");
-      ui.status.textContent = "Verifiering misslyckades: " + e.message + (ui.verifiedStarted ? "" : " – snabbsvaret ovan är inte kontrollerat.");
+      if (e.name === "AbortError") return;
+      if (job.ui) failVerify(job.ui, e.message); else job.vError = e.message;
+    }
+  }
+
+  function failVerify(ui, msg) {
+    ui.card.classList.add("err");
+    ui.status.textContent = "Verifiering misslyckades: " + msg + (ui.verifiedStarted ? "" : " – snabbsvaret ovan är inte kontrollerat.");
+  }
+
+  function applyVerify(ui, ev) {
+    const st = ui.vState;
+    if (ev.t === "status" && ev.s === "searching") {
+      ui.status.textContent = "Söker i källor…";
+    } else if (ev.t === "text") {
+      st.text += ev.d;
+      if (/^\s*INGEN\s*$/i.test(st.text)) return;
+      if (!ui.verifiedStarted) {
+        ui.verifiedStarted = true;
+        ui.quickEl.remove();
+        ui.tag.className = "tag ok";
+        ui.tag.textContent = "Verifierat med källor";
+        ui.card.classList.remove("pending");
+        ui.card.classList.add("verified");
+      }
+      ui.status.textContent = "";
+      ui.body.innerHTML = renderBody(st.text.replace(/^\s*\[[^\]\n]{3,300}\]\s*\n?/, ""));
+    } else if (ev.t === "done") {
+      ui.status.textContent = "";
+      addCost(ev.costUsd);
+      count++;
+      $("count").textContent = count;
+      for (const s of ev.sources.slice(0, 5)) {
+        const a = document.createElement("a");
+        a.href = s.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = hostOf(s.url);
+        a.title = s.title;
+        ui.src.appendChild(a);
+      }
+      const q = ui.quickMs ? `snabbsvar ${(ui.quickMs / 1000).toFixed(1)} s · ` : "";
+      const v = ((performance.now() - ui.started) / 1000).toFixed(1);
+      ui.meta.textContent = `${q}verifierat ${v} s · ${ev.searches} sökning${ev.searches === 1 ? "" : "ar"} · $${ev.costUsd.toFixed(3)}`;
+      if (/\d/.test(st.text) && ev.citedCount === 0) {
+        const w = document.createElement("div");
+        w.className = "warn";
+        w.textContent = ev.sources.length ? "⚠ Siffror utan direkt citerad källa – kontrollera innan du använder dem." : "⚠ Ingen källa hittades – kontrollera innan du använder siffrorna.";
+        ui.card.insertBefore(w, ui.meta);
+      }
     }
   }
 
@@ -461,6 +521,7 @@
     clearInterim();
     interimText = "";
     consumed = "";
+    specJob = null;
     $("toggle").textContent = "▶ Starta lyssning";
     $("toggle").className = "primary";
     setStatus("Av", false);
@@ -472,7 +533,7 @@
     let ctx = recentContext(75) || contextText(2500);
     if (interimText) ctx += `\n[${now()}] ${interimText}`;
     if (!ctx.trim()) { alert("Inget transkriberat ännu."); return; }
-    quick({ mode: "now", context: ctx });
+    handle({ mode: "now", context: ctx });
   }
 
   $("toggle").onclick = () => (active ? stop() : start());
@@ -483,7 +544,7 @@
     const v = $("q").value.trim();
     if (!v) return;
     $("q").value = "";
-    quick({ mode: "now", context: `${contextText(2000)}\n[${now()}] Rådgivaren frågar: ${v}` });
+    handle({ mode: "now", context: `${contextText(2000)}\n[${now()}] Rådgivaren frågar: ${v}` });
   };
   $("clear").onclick = () => {
     lines.length = 0;

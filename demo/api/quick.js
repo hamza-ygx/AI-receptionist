@@ -11,7 +11,7 @@ Din uppgift: avgör om den senaste repliken innehåller en fråga eller ett info
 
 Svara EXAKT i detta format:
 Rad 1: antingen ordet INGEN, eller "F: " följt av frågan omskriven som en fristående fråga (med land, år, bolagsform osv. om det framgår av samtalet).
-Om rad 1 är en fråga: därefter ett snabbsvar ur din egen kunskap. Första raden högst två korta meningar, sedan högst tre punkter som börjar med "- ". Max 50 ord. Ange år för siffror. Om du är osäker, skriv "Osäkert – vänta på verifierat svar." i stället för att gissa.
+Om rad 1 är en fråga: därefter ett snabbsvar ur din egen kunskap. Högst två korta meningar, eventuellt följt av högst två punkter som börjar med "- ". Max 40 ord. Ange år för siffror. Om du är osäker, skriv "Osäkert – vänta på verifierat svar." i stället för att gissa.
 
 Skriv INGEN för: småprat, hälsningar, tidsbokning, frågor om kundens egna siffror som bara kunden vet, ofullständiga meningar, och frågor som redan finns under "redan besvarat".
 Frågor om skatter, moms, avgifter, deadlines, regler, bolagsformer, andra länder, jämförelser, begrepp eller om byrån RKJH ska INTE ge INGEN.
@@ -49,10 +49,12 @@ export default async function handler(req, res) {
 
   let head = "";
   let decided = false;
+  let stream = null;
+  res.on("close", () => { if (!res.writableEnded) stream?.abort(); });
   try {
-    const stream = client.messages.stream({
+    stream = client.messages.stream({
       model: MODEL,
-      max_tokens: 400,
+      max_tokens: 250,
       thinking: { type: "disabled" },
       output_config: { effort: "low" },
       system: now ? SYSTEM_NOW : SYSTEM,

@@ -6,6 +6,8 @@ const MODEL = process.env.COPILOT_MODEL || "claude-sonnet-5-5";
 const EFFORT = process.env.COPILOT_EFFORT || "low";
 const PRICE = { "claude-opus-5-5": [4, 20], "claude-sonnet-5-5": [2, 10], "claude-haiku-5-5": [0.1, 0.5] };
 const SEARCH_USD = 0.01;
+const SEARCH_TOOL = process.env.COPILOT_SEARCH_TOOL || "web_search_20250305";
+const MAX_SEARCHES = Number(process.env.COPILOT_MAX_SEARCHES || 1);
 const MAX_CONTINUES = 3;
 
 const client = new Anthropic();
@@ -32,7 +34,7 @@ Dagens datum: ${today}.
 - Svara på samma språk som frågan.
 
 # Källor och siffror
-- Gör helst en enda riktad sökning (högst två). Använd webbsökningen för allt som gäller regler, skattesatser, belopp, avgifter, deadlines, andra länder och jämförelser. Lita inte på ditt eget minne för sådant.
+- Gör EN enda riktad sökning, med svenska sökord för svenska regler och landets språk för andra länder. Använd webbsökningen för allt som gäller regler, skattesatser, belopp, avgifter, deadlines, andra länder och jämförelser. Lita inte på ditt eget minne för sådant.
 - Ange bara siffror som står i en källa du hittat nu, och skriv vilket år eller inkomstår de gäller.
 - Om källorna är otydliga, gamla eller motsäger varandra: säg det kort.
 - Om du inte hittar någon säker källa: skriv "Hittade ingen säker källa" och vad rådgivaren kan säga i stället (t.ex. att återkomma).
@@ -66,16 +68,20 @@ export default async function handler(req, res) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
   if (body.warm) return res.status(204).end();
-  const mode = body.mode === "now" ? "now" : "question";
+  const mode = ["now", "utterance"].includes(body.mode) ? body.mode : "question";
+  const latest = typeof body.latest === "string" ? body.latest.trim().slice(-800) : "";
   const question = typeof body.question === "string" ? body.question.trim().slice(0, 500) : "";
   const context = typeof body.context === "string" ? body.context.slice(-6000) : "";
   if (mode === "question" && !question) return res.status(400).json({ error: "empty_question" });
   if (mode === "now" && !context.trim()) return res.status(400).json({ error: "empty_context" });
+  if (mode === "utterance" && !latest) return res.status(400).json({ error: "empty_latest" });
 
   const today = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Stockholm", dateStyle: "full" }).format(new Date());
   const prompt = mode === "now"
     ? `<transkribering>\n${context}\n</transkribering>\n\nRådgivaren tryckte på "Hjälp mig nu". Hitta den senaste frågan eller det senaste informationsbehovet i samtalet och svara på det. Börja svaret med frågan du svarar på inom hakparenteser, t.ex. [Hur hög är bolagsskatten i Danmark?], på en egen rad.`
-    : `${context ? `<transkribering>\n${context}\n</transkribering>\n\n` : ""}Fråga: ${question}`;
+    : mode === "utterance"
+      ? `${context ? `<transkribering>\n${context}\n</transkribering>\n\n` : ""}<senaste_replik>\n${latest}\n</senaste_replik>\n\nSvara på frågan eller informationsbehovet i den senaste repliken. Om den inte innehåller någon fråga, svara bara ordet INGEN.`
+      : `${context ? `<transkribering>\n${context}\n</transkribering>\n\n` : ""}Fråga: ${question}`;
 
   res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
   const send = (o) => res.write(JSON.stringify(o) + "\n");
@@ -84,6 +90,8 @@ export default async function handler(req, res) {
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0 };
   const cited = new Map();
   const found = new Map();
+  let current = null;
+  res.on("close", () => { if (!res.writableEnded) current?.abort(); });
 
   try {
     for (let i = 0; i <= MAX_CONTINUES; i++) {
@@ -92,9 +100,9 @@ export default async function handler(req, res) {
         max_tokens: 4000,
         system: [{ type: "text", text: system(today), cache_control: { type: "ephemeral" } }],
         tools: [{
-          type: "web_search_20260209",
+          type: SEARCH_TOOL,
           name: "web_search",
-          max_uses: 2,
+          max_uses: MAX_SEARCHES,
           allowed_domains: ALLOWED_DOMAINS,
           user_location: { type: "approximate", country: "SE", city: "Halmstad", timezone: "Europe/Stockholm" },
         }],
@@ -107,6 +115,7 @@ export default async function handler(req, res) {
         params.fallbacks = "default";
       }
       const stream = client.beta.messages.stream(params);
+      current = stream;
       for await (const event of stream) {
         if (event.type === "content_block_start" && event.content_block.type === "server_tool_use") {
           send({ t: "status", s: "searching" });
@@ -133,6 +142,7 @@ export default async function handler(req, res) {
     const sources = [...cited.values(), ...[...found.values()].filter((f) => !cited.has(f.url))];
     send({ t: "done", sources: sources.slice(0, 8), citedCount: cited.size, searches: usage.searches, costUsd, model: MODEL });
   } catch (e) {
+    if (e instanceof Anthropic.APIUserAbortError) return res.end();
     const err = e instanceof Anthropic.APIError ? `anthropic_${e.status}` : "internal";
     send({ t: "error", error: err, detail: String(e?.message ?? "").slice(0, 300) });
   }
