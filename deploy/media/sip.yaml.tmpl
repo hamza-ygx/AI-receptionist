@@ -1,0 +1,12 @@
+ws_url: ws://127.0.0.1:7880
+redis:
+  address: 127.0.0.1:6379
+  password: ${REDIS_PASSWORD}
+sip_port: 5060
+rtp_port: 10000-20000
+use_external_ip: false
+nat_1_to_1_ip: ${PUBLIC_IP}
+hide_inbound_port: true
+health_port: 8080
+logging:
+  level: info

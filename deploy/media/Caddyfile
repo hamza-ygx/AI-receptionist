@@ -1,0 +1,7 @@
+{$LIVEKIT_DOMAIN} {
+	reverse_proxy 127.0.0.1:7880
+	header {
+		Strict-Transport-Security "max-age=63072000"
+		-Server
+	}
+}
