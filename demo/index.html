@@ -53,7 +53,6 @@
   .meta { font-size: 13px; color: var(--muted); }
   .meta b { color: var(--ink); font-weight: 600; }
   ul.tips { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
-  #gate { display: none; }
 </style>
 </head>
 <body>
@@ -63,12 +62,6 @@
 </header>
 <main>
   <section class="card">
-    <div id="gate">
-      <form id="gateForm">
-        <input type="password" id="code" placeholder="Åtkomstkod" autocomplete="off">
-        <button class="primary" type="submit">Lås upp</button>
-      </form>
-    </div>
     <div class="controls">
       <button class="primary" id="call">📞 Ring upp</button>
       <button class="danger" id="hang" disabled>Lägg på</button>
@@ -115,10 +108,6 @@
   const GREETING = "Välkommen till Revisionskonsulterna J Hägglund. Du pratar med en AI-assistent, och samtalet transkriberas så att vi kan hjälpa dig. Hur kan jag hjälpa dig? … If you prefer English, just say so.";
   const $ = (id) => document.getElementById(id);
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const store = {
-    get(k) { try { return sessionStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { sessionStorage.setItem(k, v); } catch {} },
-  };
 
   let state = null;
   let rec = null;
@@ -209,11 +198,10 @@
     try {
       const r = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "x-demo-code": store.get("demoCode") || "" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: state.messages, text, lang: state.lang, startedAt: state.startedAt, simulateOpen: $("simOpen").checked }),
       });
       data = await r.json().catch(() => ({}));
-      if (r.status === 401) { $("gate").style.display = "block"; add("sys", "Fel eller saknad åtkomstkod."); return; }
       if (!r.ok) { add("sys", `Fel: ${data.error || r.status}${data.detail ? " – " + data.detail : ""}`); return; }
     } catch (e) {
       add("sys", "Nätverksfel: " + e.message);
@@ -307,14 +295,6 @@
     busy = false;
     send(t);
   };
-  $("gateForm").onsubmit = (e) => {
-    e.preventDefault();
-    store.set("demoCode", $("code").value.trim());
-    $("gate").style.display = "none";
-    add("sys", "Kod sparad. Försök igen.");
-  };
-  const q = new URLSearchParams(location.search).get("code");
-  if (q) { store.set("demoCode", q); history.replaceState(null, "", location.pathname); }
   if ("speechSynthesis" in window) speechSynthesis.onvoiceschanged = () => {};
 })();
 </script>

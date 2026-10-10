@@ -13,11 +13,13 @@ A talk-to-it demo of the receptionist for testing persona, guardrails and tool f
 | Var | |
 |---|---|
 | `ANTHROPIC_API_KEY` | required |
-| `DEMO_ACCESS_CODE` | optional gate; send as `?code=` once or enter in the UI |
 | `DEMO_MODEL` / `DEMO_EFFORT` / `DEMO_ASSISTANT_NAME` | optional |
 
 ## Data
 `api/_data.json` is generated from `config/` and `prompts/`: `node demo/scripts/build-data.mjs` (needs the root `node_modules` for `yaml`).
+
+## Access
+The project uses Vercel Authentication (only logged-in team members can open it). There is no app-level gate.
 
 ## Privacy
 Test data only. Requests go to Anthropic's API (US processing), unlike production which stays in the EU.

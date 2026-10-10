@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 const DATA = JSON.parse(readFileSync(new URL("./_data.json", import.meta.url), "utf8"));
@@ -415,18 +415,9 @@ function validHistory(messages) {
   return true;
 }
 
-function codeOk(req) {
-  const expected = process.env.DEMO_ACCESS_CODE;
-  if (!expected) return true;
-  const given = Buffer.from(String(req.headers["x-demo-code"] ?? ""));
-  const want = Buffer.from(expected);
-  return given.length === want.length && timingSafeEqual(given, want);
-}
-
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
-  if (!codeOk(req)) return res.status(401).json({ error: "bad_code" });
   if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ error: "missing_api_key" });
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body ?? {};
