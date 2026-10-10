@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { db } from "../../lib/db.js";
+import { db } from "../lib/db.js";
 import { defineTool, ok } from "./types.js";
 import { text } from "./common.js";
 

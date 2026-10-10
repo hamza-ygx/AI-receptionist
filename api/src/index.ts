@@ -1,10 +1,10 @@
 import { app } from "@azure/functions";
 import { appRole } from "./lib/config.js";
-import { registerVoice } from "./functions/voice.js";
+import { registerJobs } from "./functions/jobs.js";
 import { registerDash } from "./functions/dash.js";
 
 app.setup({ enableHttpStream: false });
 
 const role = appRole();
-if (role === "voice" || role === "all") registerVoice();
+if (role === "jobs" || role === "all") registerJobs();
 if (role === "dash" || role === "all") registerDash();

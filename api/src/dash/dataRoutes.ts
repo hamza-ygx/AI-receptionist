@@ -70,11 +70,6 @@ route("DELETE", "/calls/:id", "admin", async (c) => {
     await t.query("DELETE FROM messages WHERE call_id = $1", [id]);
     await t.query("DELETE FROM transfers WHERE call_id = $1", [id]);
     await t.query("DELETE FROM tool_call_results WHERE call_id = $1", [id]);
-    await t.query(
-      `INSERT INTO vapi_deletions (call_id) VALUES ($1)
-       ON CONFLICT (call_id) DO UPDATE SET next_attempt_at = now() WHERE vapi_deletions.confirmed_at IS NULL`,
-      [id],
-    );
     return r.rowCount ?? 0;
   });
   if (!deleted) throw new HttpError(404, "not_found");

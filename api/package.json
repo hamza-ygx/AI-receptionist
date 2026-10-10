@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/src/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json && node -e \"require('fs').cpSync('../config','config',{recursive:true})\"",
+    "build": "tsc -p tsconfig.json && node -e \"const fs=require('fs');fs.cpSync('../config','config',{recursive:true});fs.cpSync('../prompts','prompts',{recursive:true})\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "func start",
     "db:migrate": "tsx src/scripts/migrate.ts",

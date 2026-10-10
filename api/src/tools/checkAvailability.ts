@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { DateTime, Interval } from "luxon";
-import { db } from "../../lib/db.js";
-import { TZ } from "../../lib/config.js";
-import { nowLocal, officeConfig } from "../../lib/office.js";
-import { candidateSlots, isFree, spokenSlot, spread } from "../../lib/slots.js";
-import { busyIntervals } from "../../graph/calendar.js";
+import { db } from "../lib/db.js";
+import { TZ } from "../lib/config.js";
+import { nowLocal, officeConfig } from "../lib/office.js";
+import { candidateSlots, isFree, spokenSlot, spread } from "../lib/slots.js";
+import { busyIntervals } from "../graph/calendar.js";
 import { findStaff } from "./resolveStaff.js";
 import { defineTool, ok, refuse } from "./types.js";
 import { optText, staffIdSchema } from "./common.js";

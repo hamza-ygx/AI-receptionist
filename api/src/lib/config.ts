@@ -27,9 +27,9 @@ export function flag(name: string, fallback = false): boolean {
   return v === "1" || v.toLowerCase() === "true";
 }
 
-export const appRole = (): "voice" | "dash" | "all" => {
+export const appRole = (): "jobs" | "dash" | "all" => {
   const r = optional("APP_ROLE", "all");
-  if (r !== "voice" && r !== "dash" && r !== "all") throw new Error("APP_ROLE must be voice|dash|all");
+  if (r !== "jobs" && r !== "dash" && r !== "all") throw new Error("APP_ROLE must be jobs|dash|all");
   return r;
 };
 

@@ -135,10 +135,8 @@
     "messages": "Messages",
     "transfers": "Transfers",
     "noTranscript": "No transcript stored.",
-    "vapiDeleted": "Deleted at Vapi",
-    "vapiPending": "Pending deletion at Vapi",
     "erase": "Erase call (GDPR)",
-    "eraseConfirm": "Permanently erase this call, its transcript and related messages? The deletion is also sent to Vapi. Outlook calendar bookings are not affected."
+    "eraseConfirm": "Permanently erase this call, its transcript and related messages? Outlook calendar bookings are not affected."
   },
   "messages": {
     "title": "Messages",

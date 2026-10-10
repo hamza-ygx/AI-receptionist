@@ -88,7 +88,7 @@ export function CallsPage() {
 }
 
 interface CallDetail {
-  call: CallRow & { ended_at: string | null; callback_number: string | null; summary_sv: string | null; transcript: string | null; ended_reason: string | null; cost_total: string | null; vapi_deleted_at: string | null };
+  call: CallRow & { ended_at: string | null; callback_number: string | null; summary_sv: string | null; transcript: string | null; ended_reason: string | null; cost_total: string | null };
   bookings: { id: string; staff_name: string; start_at: string; end_at: string; meeting_type: string; topic: string; teams_join_url: string | null }[];
   messages: { id: string; staff_name: string | null; reason: string; urgency: string; handled_at: string | null }[];
   transfers: { id: string; staff_name: string; status: string; reason: string | null; created_at: string }[];
@@ -144,7 +144,6 @@ export function CallDetailPage() {
             <dt>{t("calls.duration")}</dt><dd className="num">{duration(call.duration_s)}</dd>
             <dt>{t("calls.cost")}</dt><dd className="num">{usd(call.cost_total, 3)}</dd>
             <dt>{t("calls.endedReason")}</dt><dd className="mono">{call.ended_reason ?? "–"}</dd>
-            <dt>Vapi</dt><dd>{call.vapi_deleted_at ? <span className="badge badge-good">✓ {t("calls.vapiDeleted")}</span> : <span className="badge badge-warn">{t("calls.vapiPending")}</span>}</dd>
           </dl>
         </div>
       </div>

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { db } from "../../lib/db.js";
-import { normalizeE164, spokenSwedish } from "../../lib/phone.js";
-import { officeConfig } from "../../lib/office.js";
-import { errMsg } from "../../lib/log.js";
-import { postMessage } from "../../teams/notify.js";
+import { db } from "../lib/db.js";
+import { normalizeE164, spokenSwedish } from "../lib/phone.js";
+import { officeConfig } from "../lib/office.js";
+import { errMsg } from "../lib/log.js";
+import { postMessage } from "../teams/notify.js";
 import { defineTool, ok, refuse } from "./types.js";
 import { optText, staffIdSchema, text, urgencySchema } from "./common.js";
 import { bumpToolCount } from "./limits.js";

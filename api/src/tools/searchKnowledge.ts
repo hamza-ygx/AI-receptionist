@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { searchKnowledge } from "../../kb/search.js";
+import { searchKnowledge } from "../kb/search.js";
 import { defineTool, ok } from "./types.js";
 import { langSchema, text } from "./common.js";
 

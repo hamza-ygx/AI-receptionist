@@ -135,10 +135,8 @@
     "messages": "Meddelanden",
     "transfers": "Kopplingar",
     "noTranscript": "Ingen transkription sparad.",
-    "vapiDeleted": "Raderat hos Vapi",
-    "vapiPending": "Väntar på radering hos Vapi",
     "erase": "Radera samtal (GDPR)",
-    "eraseConfirm": "Radera samtalet, transkriptionen och tillhörande meddelanden permanent? Raderingen skickas även till Vapi. Kalenderbokningar i Outlook påverkas inte."
+    "eraseConfirm": "Radera samtalet, transkriptionen och tillhörande meddelanden permanent? Kalenderbokningar i Outlook påverkas inte."
   },
   "messages": {
     "title": "Meddelanden",

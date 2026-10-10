@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { Logger } from "../../lib/log.js";
+import type { Logger } from "../lib/log.js";
 
 export interface ToolContext {
   callId: string;

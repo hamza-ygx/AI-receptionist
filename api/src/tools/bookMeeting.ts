@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { DateTime } from "luxon";
-import { db, tx } from "../../lib/db.js";
-import { TZ } from "../../lib/config.js";
-import { nowLocal, officeConfig } from "../../lib/office.js";
-import { isFree, spokenSlot, validateSlot } from "../../lib/slots.js";
-import { normalizeE164, spokenSwedish } from "../../lib/phone.js";
-import { sha256Hex } from "../../lib/crypto.js";
-import { errMsg } from "../../lib/log.js";
-import { busyIntervals, createEvent, deleteEvent } from "../../graph/calendar.js";
-import { notifyBooking } from "../../teams/notify.js";
+import { db, tx } from "../lib/db.js";
+import { TZ } from "../lib/config.js";
+import { nowLocal, officeConfig } from "../lib/office.js";
+import { isFree, spokenSlot, validateSlot } from "../lib/slots.js";
+import { normalizeE164, spokenSwedish } from "../lib/phone.js";
+import { sha256Hex } from "../lib/crypto.js";
+import { errMsg } from "../lib/log.js";
+import { busyIntervals, createEvent, deleteEvent } from "../graph/calendar.js";
+import { notifyBooking } from "../teams/notify.js";
 import { defineTool, ok, refuse } from "./types.js";
 import { optText, staffIdSchema, text } from "./common.js";
 

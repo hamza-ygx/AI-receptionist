@@ -1,4 +1,4 @@
-import { db } from "../../lib/db.js";
+import { db } from "../lib/db.js";
 
 export async function bumpToolCount(callId: string, tool: string): Promise<number> {
   const r = await db().query<{ count: number }>(
