@@ -1,5 +1,6 @@
 # Media + agent host (one Ubuntu VM in Sweden Central). Host networking is required by LiveKit SIP/RTP.
-# Secrets come from /etc/rkjh/media.env (written by bootstrap.sh from Key Vault), never from this repo.
+# Secrets come from /etc/rkjh/*.env (written by bootstrap.sh from Key Vault), never from this repo.
+# Nothing listens publicly except SIP (5060) and SIP RTP (10000-20000), restricted to Twilio in the NSG.
 services:
   redis:
     image: redis:7.4-alpine
@@ -33,16 +34,6 @@ services:
       - ./sip.yaml:/etc/sip.yaml:ro
     depends_on: [livekit]
 
-  caddy:
-    image: caddy:2.8
-    network_mode: host
-    restart: unless-stopped
-    environment:
-      LIVEKIT_DOMAIN: ${LIVEKIT_DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-
   agent:
     image: ${AGENT_IMAGE}
     network_mode: host
@@ -56,4 +47,3 @@ services:
 
 volumes:
   redis-data:
-  caddy-data:

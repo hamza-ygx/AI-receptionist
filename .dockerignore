@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+web
+infra
+docs
+.git
+**/*.local.ts
+**/local.settings.json
+.env
+.env.*
