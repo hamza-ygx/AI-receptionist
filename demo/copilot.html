@@ -56,6 +56,11 @@
   .ans.verified { border-left-color: var(--accent); }
   .ans.pending { border-left-color: #f2b705; }
   #err { color: var(--danger); font-size: 13px; margin-top: 6px; }
+  .ans .facts { border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px; margin: 4px 0 8px; }
+  .ans .facts .ftag { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+  .ans .facts .fact { font-size: 19px; line-height: 1.4; margin: 2px 0; }
+  .ans .facts .fmeta { font-size: 12px; color: var(--muted); }
+  .ans .facts .fmeta a { color: var(--brand); }
   #transcript { height: 62vh; min-height: 280px; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
   #transcript .line { padding: 2px 0; border-bottom: 1px dashed var(--line); overflow-wrap: anywhere; }
   #transcript .line time { color: var(--muted); font-size: 12px; margin-right: 6px; }
@@ -409,6 +414,8 @@
           answered.push(ev.question);
           if (answered.length > 20) answered.shift();
           attachCard(job, ev.question, line);
+        } else if (ev.t === "facts" && job.ui) {
+          renderFacts(job.ui, ev.items);
         } else if (ev.t === "none") {
           decided = true;
           job.vCtl?.abort();
@@ -449,6 +456,31 @@
       if (e.name === "AbortError") return;
       if (job.ui) failVerify(job.ui, e.message); else job.vError = e.message;
     }
+  }
+
+  function renderFacts(ui, items) {
+    const box = document.createElement("div");
+    box.className = "facts";
+    const tag = document.createElement("div");
+    tag.className = "ftag";
+    tag.textContent = "Bekräftat i byråns faktablad";
+    box.appendChild(tag);
+    for (const it of items) {
+      const f = document.createElement("div");
+      f.className = "fact";
+      f.textContent = it.fact;
+      const m = document.createElement("div");
+      m.className = "fmeta";
+      m.append(document.createTextNode(`${it.validFor ? it.validFor + " · " : ""}kontrollerat av ${it.verifiedBy} ${it.verifiedOn} · `));
+      const a = document.createElement("a");
+      a.href = it.source;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      a.textContent = hostOf(it.source);
+      m.appendChild(a);
+      box.append(f, m);
+    }
+    ui.card.insertBefore(box, ui.tag);
   }
 
   function failVerify(ui, msg) {

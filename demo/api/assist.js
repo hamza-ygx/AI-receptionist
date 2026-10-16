@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
+import { matchFacts, factsPrompt } from "./_facts.js";
 
 const DATA = JSON.parse(readFileSync(new URL("./_data.json", import.meta.url), "utf8"));
 const MODEL = process.env.COPILOT_MODEL || "claude-sonnet-5-5";
@@ -86,7 +87,8 @@ export default async function handler(req, res) {
   res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
   const send = (o) => { if (!res.destroyed && !res.writableEnded) res.write(JSON.stringify(o) + "\n"); };
 
-  const messages = [{ role: "user", content: prompt }];
+  const facts = matchFacts(`${question} ${latest}`);
+  const messages = [{ role: "user", content: factsPrompt(facts) + prompt }];
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0 };
   const cited = new Map();
   const found = new Map();

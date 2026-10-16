@@ -1,0 +1,26 @@
+# Confirmed facts for the call copilot (demo/copilot).
+#
+# Only add an entry after a consultant has checked it against the source.
+# Entries are matched by keyword, without AI, and shown on screen as
+# "Bekräftat" next to the answer, with source, period and who verified it.
+# They are also given to the sourced answer as the firm's confirmed facts.
+#
+# Review every entry at least once a year (rates and thresholds change each
+# income year). Remove or update entries whose `valid_for` has passed.
+#
+# Fields:
+#   keywords:    words or phrases that trigger the entry (lowercase, any language)
+#   fact:        one or two short sentences, exactly as the advisor may say them
+#   valid_for:   period the fact applies to, e.g. "inkomstår 2026" or "2026"
+#   source:      URL of the official page the fact was checked against
+#   verified_by: initials of the consultant who checked it
+#   verified_on: date checked (YYYY-MM-DD)
+#
+# Example (not active; copy, fill in from the source, and uncomment):
+# - keywords: ["bolagsskatt sverige", "bolagsskatten i sverige", "swedish corporate tax"]
+#   fact: "Bolagsskatten i Sverige är XX procent."
+#   valid_for: "beskattningsår som börjar efter 31 dec 20XX"
+#   source: "https://www.skatteverket.se/..."
+#   verified_by: "JH"
+#   verified_on: "2026-10-16"
+facts: []

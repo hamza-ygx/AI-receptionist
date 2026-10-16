@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { readFileSync } from "node:fs";
+import { matchFacts } from "./_facts.js";
 
 const DATA = JSON.parse(readFileSync(new URL("./_data.json", import.meta.url), "utf8"));
 const MODEL = process.env.COPILOT_QUICK_MODEL || "claude-haiku-5-5";
@@ -72,6 +73,8 @@ export default async function handler(req, res) {
       if (!m) { send({ t: "none" }); stream.abort(); break; }
       decided = true;
       send({ t: "q", question: m[1].slice(0, 300) });
+      const facts = matchFacts(`${m[1]} ${latest}`);
+      if (facts.length) send({ t: "facts", items: facts });
       const rest = head.slice(nl + 1);
       if (rest) send({ t: "text", d: rest });
     }
