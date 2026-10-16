@@ -88,7 +88,7 @@ class Receptionist extends voice.Agent<CallState> {
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
-    proc.userData.vad = await silero.VAD.load({ minSilenceDuration: 0.45 });
+    proc.userData.vad = await silero.VAD.load({ minSilenceDuration: 450 });
   },
 
   entry: async (ctx: JobContext) => {
@@ -132,7 +132,7 @@ export default defineAgent({
       turnHandling: {
         turnDetection: "vad",
         endpointing: { minDelay: 550, maxDelay: 3000 },
-        interruption: { enabled: true, mode: "vad", minDuration: 0.4 },
+        interruption: { enabled: true, mode: "vad", minDuration: 400 },
       },
       ttsTextTransforms: ["filter_markdown", "filter_emoji"],
     });
