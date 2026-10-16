@@ -1,9 +1,18 @@
-import { llm } from "@livekit/agents";
+import { llm, voice } from "@livekit/agents";
 import { z } from "zod";
 import { executeTool } from "../../api/src/core/executeTool.js";
 import type { CallState } from "./state.js";
 
 type Opts = llm.ToolOptions<CallState>;
+
+async function withTyping<T>(state: CallState, fn: () => Promise<T>): Promise<T> {
+  const typing = state.bg?.play({ source: voice.BuiltinAudioClip.KEYBOARD_TYPING, volume: 0.25 }, true);
+  try {
+    return await fn();
+  } finally {
+    typing?.stop();
+  }
+}
 
 async function run(name: string, args: unknown, { ctx, toolCallId }: Opts): Promise<string> {
   const s = ctx.userData;
@@ -41,7 +50,7 @@ export function businessTools() {
       }),
       execute: async (args, opts: Opts) => {
         const msg = opts.ctx.userData.lang === "sv" ? "Jag tittar i kalendern, ett ögonblick." : "Let me check the calendar, one moment.";
-        return opts.ctx.filler(msg, { delay: 1200 }, () => run("check_availability", args, opts));
+        return opts.ctx.filler(msg, { delay: 1200 }, () => withTyping(opts.ctx.userData, () => run("check_availability", args, opts)));
       },
     }),
     llm.tool({
@@ -60,7 +69,7 @@ export function businessTools() {
       }),
       execute: async (args, opts: Opts) => {
         const msg = opts.ctx.userData.lang === "sv" ? "Jag bokar det nu." : "I'm booking that now.";
-        return opts.ctx.filler(msg, { delay: 1200 }, () => run("book_meeting", args, opts));
+        return opts.ctx.filler(msg, { delay: 1200 }, () => withTyping(opts.ctx.userData, () => run("book_meeting", args, opts)));
       },
     }),
     llm.tool({

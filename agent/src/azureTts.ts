@@ -1,7 +1,11 @@
 import { AudioByteStream, shortuuid, tts, type APIConnectOptions } from "@livekit/agents";
+import type { AudioFrame } from "@livekit/rtc-node";
+import { ReadableStream } from "node:stream/web";
 
 const SAMPLE_RATE = 24000;
 const CHANNELS = 1;
+const PHRASES = new Map<string, Promise<Uint8Array>>();
+const READY = new Map<string, Uint8Array>();
 
 export interface AzureTtsOptions {
   region: string;
@@ -52,6 +56,32 @@ export class AzureTTS extends tts.TTS {
     });
     if (!res.ok || !res.body) throw new Error(`Azure TTS ${res.status}`);
     return res;
+  }
+
+  prerender(text: string): Promise<Uint8Array> {
+    const key = `${this.#opts.voice}|${text}`;
+    let pending = PHRASES.get(key);
+    if (!pending) {
+      pending = this.fetchAudio(text, AbortSignal.timeout(10_000))
+        .then(async (res) => new Uint8Array(await res.arrayBuffer()))
+        .then((pcm) => { READY.set(key, pcm); return pcm; });
+      pending.catch(() => PHRASES.delete(key));
+      PHRASES.set(key, pending);
+    }
+    return pending;
+  }
+
+  cachedAudio(text: string): ReadableStream<AudioFrame> | null {
+    const pcm = READY.get(`${this.#opts.voice}|${text}`);
+    if (!pcm) return null;
+    return new ReadableStream<AudioFrame>({
+      start(controller) {
+        const bytes = new AudioByteStream(SAMPLE_RATE, CHANNELS);
+        for (const frame of bytes.write(pcm)) controller.enqueue(frame);
+        for (const frame of bytes.flush()) controller.enqueue(frame);
+        controller.close();
+      },
+    });
   }
 
   synthesize(text: string, connOptions?: APIConnectOptions, abortSignal?: AbortSignal): tts.ChunkedStream {

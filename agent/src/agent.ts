@@ -23,7 +23,17 @@ import { estimateCost } from "./cost.js";
 import type { CallState } from "./state.js";
 
 const AGENT_NAME = process.env.LIVEKIT_AGENT_NAME ?? "rkjh-receptionist";
-const GREETING_SV = "Välkommen till Revisionskonsulterna J Hägglund. Du pratar med en AI-assistent, och samtalet transkriberas så att vi kan hjälpa dig. Hur kan jag hjälpa dig? … If you prefer English, just say so.";
+const DISCLOSURE_SV = "Välkommen till Revisionskonsulterna J Hägglund. Du pratar med en AI-assistent, och samtalet transkriberas så att vi kan hjälpa dig.";
+const ASK_SV = "Hur kan jag hjälpa dig? … If you prefer English, just say so.";
+const HOLD = { sv: "Ett ögonblick, jag försöker koppla dig.", en: "One moment, I'll try to connect you." };
+const BYE = { sv: "Vi behöver tyvärr avsluta samtalet nu. Tack för att du ringde!", en: "We need to end the call now. Thank you for calling!" };
+const FIXED_PHRASES = { sv: [DISCLOSURE_SV, ASK_SV, HOLD.sv, BYE.sv], en: [HOLD.en, BYE.en] };
+
+function sayFixed(session: voice.AgentSession<CallState>, engine: AzureTTS, text: string, opts: { allowInterruptions: boolean }) {
+  const audio = engine.cachedAudio(text);
+  if (!audio) void engine.prerender(text).catch(() => undefined);
+  return session.say(text, audio ? { ...opts, audio } : opts);
+}
 const MAX_CALL_MS = Number(process.env.MAX_CALL_SECONDS ?? 900) * 1000;
 
 function env(name: string, fallback?: string): string {
@@ -69,15 +79,16 @@ function transcriptOf(session: voice.AgentSession<CallState>): string {
 }
 
 class Receptionist extends voice.Agent<CallState> {
-  constructor(public lang: "sv" | "en", instructions: string, tts: AzureTTS, tools: llm.ToolContextLike<CallState>, chatCtx?: llm.ChatContext) {
-    super({ instructions, tts, tools, chatCtx });
+  constructor(public lang: "sv" | "en", instructions: string, public voiceTts: AzureTTS, tools: llm.ToolContextLike<CallState>, chatCtx?: llm.ChatContext) {
+    super({ instructions, tts: voiceTts, tools, chatCtx });
   }
 
   override async onEnter(): Promise<void> {
     this.session.userData.lang = this.lang;
     const spoken = this.session.history.items.some((i) => i.type === "message" && (i.role === "user" || i.role === "assistant"));
     if (!spoken) {
-      this.session.say(GREETING_SV, { allowInterruptions: true });
+      sayFixed(this.session, this.voiceTts, DISCLOSURE_SV, { allowInterruptions: false });
+      sayFixed(this.session, this.voiceTts, ASK_SV, { allowInterruptions: true });
     } else if (this.lang === "en") {
       this.session.generateReply({ instructions: "The caller speaks English. Continue the conversation in English and answer their last message." });
     } else {
@@ -89,6 +100,12 @@ class Receptionist extends voice.Agent<CallState> {
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load({ minSilenceDuration: 450 });
+    try {
+      const warm = (["sv", "en"] as const).flatMap((lang) => FIXED_PHRASES[lang].map((t) => makeTts(lang).prerender(t)));
+      await Promise.race([Promise.allSettled(warm), new Promise((r) => setTimeout(r, 8000))]);
+    } catch {
+      // Speech credentials missing in dev: phrases are synthesized on demand instead.
+    }
   },
 
   entry: async (ctx: JobContext) => {
@@ -111,6 +128,7 @@ export default defineAgent({
       llmCompletionTokens: 0,
       ttsCharacters: 0,
       log,
+      bg: null,
     };
     log.info("Call started", { room: state.callId, from: maskPhone(callerNumber) });
 
@@ -159,8 +177,7 @@ export default defineAgent({
             const s = run.userData;
             const approved = await approveTransfer(s.callId, staffId, reason, callerName ?? null, company ?? null);
             if (!approved.ok) return JSON.stringify({ ok: false, reason: approved.reason, instruction: approved.instruction });
-            const holdMsg = s.lang === "sv" ? "Ett ögonblick, jag försöker koppla dig." : "One moment, I'll try to connect you.";
-            await run.session.say(holdMsg, { allowInterruptions: false }).waitForPlayout();
+            await sayFixed(run.session, ttsByLang[s.lang], HOLD[s.lang], { allowInterruptions: false }).waitForPlayout();
             const mode = process.env.TRANSFER_MODE === "cold" ? "cold" : "warm";
             const status = mode === "cold"
               ? await coldTransfer(s, approved.staff)
@@ -227,8 +244,7 @@ export default defineAgent({
 
     const maxTimer = setTimeout(() => {
       state.endedReason = "max_duration";
-      const bye = state.lang === "sv" ? "Vi behöver tyvärr avsluta samtalet nu. Tack för att du ringde!" : "We need to end the call now. Thank you for calling!";
-      session.say(bye, { allowInterruptions: false }).waitForPlayout().finally(() => void ctx.deleteRoom());
+      sayFixed(session, ttsByLang[state.lang], BYE[state.lang], { allowInterruptions: false }).waitForPlayout().finally(() => void ctx.deleteRoom());
     }, MAX_CALL_MS);
 
     ctx.room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
@@ -271,6 +287,11 @@ export default defineAgent({
       room: ctx.room,
       inputOptions: { participantIdentity: caller.identity, closeOnDisconnect: false },
     });
+
+    const bg = new voice.BackgroundAudioPlayer();
+    await bg.start({ room: ctx.room, agentSession: session as unknown as voice.AgentSession })
+      .then(() => { state.bg = bg; })
+      .catch((e) => log.warn("Background audio unavailable", { err: errMsg(e) }));
   },
 });
 

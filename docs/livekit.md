@@ -32,8 +32,11 @@ Secrets come from Key Vault through the VM's managed identity (`deploy/media/boo
 ## The agent (agent/src)
 
 - **Language:** the Azure STT plugin runs continuous language identification over `sv-SE` and `en-US`. When a final transcript of two or more words is detected as the other language, the session hands over to the matching agent: same tools, same history, the other prompt and voice. The model can also switch explicitly (`switch_to_english` / `switch_to_swedish`).
-- **Turn-taking:** Silero VAD plus endpointing (`minDelay` 550 ms). LiveKit's turn-detector model isn't calibrated for Swedish and its large model is Cloud-only.
-- **TTS:** `agent/src/azureTts.ts` streams PCM from the Azure Speech REST API. The LiveKit Node plugin has no Azure TTS.
+- **Turn-taking:** Silero VAD (silence 450 ms) plus endpointing (`minDelay` 550 ms); barge-in needs 400 ms of speech. All durations are milliseconds in `@livekit/agents` 1.x. No turn-detector model supports Swedish, and LiveKit's adaptive interruption is Cloud-only.
+- **Greeting:** the AI/transcription disclosure (EU AI Act Art. 50) is spoken with interruptions off; the question after it can be interrupted.
+- **TTS:** `agent/src/azureTts.ts` streams PCM from the Azure Speech REST API. The LiveKit Node plugin has no Azure TTS. Fixed phrases (disclosure, greeting, hold, goodbye) are synthesised once per worker in `prewarm` and replayed from memory.
+- **Sounds:** one background-audio track per call: quiet keyboard typing while calendar lookups or bookings run, hold music during warm transfers.
+- **Prompt:** `prompts/*/system.v3.md`. Per-call values (time, open/closed, caller line) sit at the end so the static part can be prompt-cached.
 - **Tools:** `search_knowledge`, `resolve_staff`, `check_availability`, `book_meeting` and `take_message` go through `api/src/core/executeTool.ts`. That layer handles zod validation, per-call limits and idempotency per tool-call id. `transfer_to_staff`, the language switch and `end_call` are agent-side.
 - **Post-call:** the transcript goes to Azure OpenAI with a strict JSON schema (Swedish summary plus fields), then to `ingestCall` and Teams cards. No audio is recorded anywhere.
 - **Safety:**

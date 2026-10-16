@@ -1,4 +1,4 @@
-import type { JobContext } from "@livekit/agents";
+import type { JobContext, voice } from "@livekit/agents";
 import type { Logger } from "../../api/src/lib/log.js";
 
 export interface CallState {
@@ -14,4 +14,5 @@ export interface CallState {
   llmCompletionTokens: number;
   ttsCharacters: number;
   log: Logger;
+  bg: voice.BackgroundAudioPlayer | null;
 }

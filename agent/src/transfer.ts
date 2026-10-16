@@ -116,9 +116,9 @@ export async function warmTransfer(state: CallState, session: AgentSession<CallS
   const caller = room.remoteParticipants.get(state.callerIdentity);
 
   setListening(caller, false);
-  const bg = new voice.BackgroundAudioPlayer();
-  await bg.start({ room, agentSession: session as unknown as AgentSession });
-  const hold = bg.play(voice.BuiltinAudioClip.HOLD_MUSIC, true);
+  const ownBg = state.bg ? null : new voice.BackgroundAudioPlayer();
+  if (ownBg) await ownBg.start({ room, agentSession: session as unknown as AgentSession });
+  const hold = (state.bg ?? ownBg)!.play(voice.BuiltinAudioClip.HOLD_MUSIC, true);
 
   const source = new AudioSource(ttsEngine.sampleRate, ttsEngine.numChannels);
   const track = LocalAudioTrack.createAudioTrack("transfer_brief", source);
@@ -133,7 +133,7 @@ export async function warmTransfer(state: CallState, session: AgentSession<CallS
   const cleanup = async (keepConsultant: boolean) => {
     room.off(RoomEvent.TrackPublished, hideFromCaller);
     hold.stop();
-    await bg.close().catch(() => undefined);
+    await ownBg?.close().catch(() => undefined);
     await room.localParticipant!.unpublishTrack(briefPub.sid!).catch(() => undefined);
     await source.close().catch(() => undefined);
     if (!keepConsultant) await rooms.removeParticipant(roomName, consultantId).catch(() => undefined);

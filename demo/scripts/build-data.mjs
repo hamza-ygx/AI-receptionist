@@ -10,8 +10,8 @@ const data = {
   office,
   facts,
   faq,
-  promptSv: read("prompts/sv/system.v2.md"),
-  promptEn: read("prompts/en/system.v2.md"),
+  promptSv: read("prompts/sv/system.v3.md"),
+  promptEn: read("prompts/en/system.v3.md"),
 };
 writeFileSync(new URL("../api/_data.json", import.meta.url), JSON.stringify(data));
 console.log("wrote api/_data.json");
