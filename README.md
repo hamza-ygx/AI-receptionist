@@ -36,7 +36,9 @@ Details: [docs/livekit.md](docs/livekit.md) (call engine) and [docs/PLAN.md](doc
 | `api/migrations/` | SQL migrations. Run with `npm run db:migrate` or `POST /api/admin/migrate` (master key). |
 | `prompts/` | Versioned system prompts (`sv/`, `en/`). |
 | `web/` | Dashboard (React 19 + Vite). Swedish UI with English i18n. |
-| `config/` | `staff.yaml`, `office.yaml` (hours, holidays, loop protection), `core-facts.yaml`, `faq.yaml`. These are seeded into the DB. |
+| `config/` | `staff.yaml`, `office.yaml` (hours, holidays, loop protection), `core-facts.yaml`, `faq.yaml`. These are seeded into the DB. `copilot-facts.yaml` holds confirmed facts for the call copilot. |
+| `demo/` | Vercel browser demo of the receptionist (`/`) and the call copilot prototype (`/copilot`). See [demo/README.md](demo/README.md) and [docs/copilot.md](docs/copilot.md). |
+| `reports/`, `research_notes/` | Competitor and best-practice research (October 2026) with a prioritized improvement list. |
 | `deploy/media/` | Docker Compose stack for the media VM, plus `bootstrap.sh` (secrets from Key Vault via managed identity). |
 | `infra/` | Bicep (`main.bicep` plus modules), params, and scripts (`deploy.sh`, `set-secrets.sh`, `package-api.sh`, `pg-roles.sql`). |
 | `docs/` | Setup guides, GDPR notes, suggested tests. |

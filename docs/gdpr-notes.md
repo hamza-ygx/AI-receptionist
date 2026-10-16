@@ -25,6 +25,10 @@ This is an internal tool that processes **client personal data**: names, company
 | Azure OpenAI Data Zone EU | LLM inference | EU/EFTA data zone | Switch to the regional `gpt-5.1` deployment if processing must stay in Sweden |
 | Static Web Apps | Dashboard hosting | West Europe resource; global edge | Static assets hold no personal data. `/api` responses pass through the SWA edge |
 
+## Call copilot (prototype)
+
+The browser copilot in `demo/` is for test calls only. With the browser speech engine, call audio goes to Google; the text always goes to Anthropic (US). Conditions before client calls are listed in [copilot.md](copilot.md#before-real-client-calls).
+
 ## Transparency
 
 - Callers hear at the start of every call: *"Du pratar med en AI-assistent, och samtalet transkriberas så att vi kan hjälpa dig."* ("You are talking to an AI assistant, and the call is transcribed so that we can help you.")
