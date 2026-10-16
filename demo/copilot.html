@@ -84,6 +84,10 @@
     <option value="sv-SE">Svenska</option>
     <option value="en-US">English</option>
   </select>
+  <select id="engine" title="Taligenkänning" hidden>
+    <option value="azure">Tal: Azure (EU)</option>
+    <option value="browser">Tal: webbläsaren</option>
+  </select>
   <label style="color:inherit"><input type="checkbox" id="auto" checked> Auto-svar</label>
   <button class="primary" id="toggle">▶ Starta lyssning</button>
   <button class="help" id="help" title="Svara på senaste frågan (mellanslag)">Hjälp mig nu</button>
@@ -107,7 +111,7 @@
       </div>
       <div id="err"></div>
     </section>
-    <p class="empty" style="margin:10px 2px">Prototyp. Svar är underlag och kan vara fel – kontrollera siffror mot källan innan du citerar. Använd inte på riktiga kundsamtal ännu: ljudet går till Google (taligenkänning) och texten till Anthropic (USA). Inget sparas på servern.</p>
+    <p class="empty" style="margin:10px 2px">Prototyp. Svar är underlag och kan vara fel – kontrollera siffror mot källan innan du citerar. Använd inte på riktiga kundsamtal ännu: med "Tal: webbläsaren" går ljudet till Google, och texten går alltid till Anthropic (USA). "Tal: Azure (EU)" håller ljudet i Sweden Central. Inget sparas på servern.</p>
   </aside>
 </main>
 <script>
@@ -214,13 +218,7 @@
           interim += r[0].transcript;
         }
       }
-      interim = interim.trim();
-      if (interim) showInterim(interim); else clearInterim();
-      if (interim !== interimText) {
-        interimText = interim;
-        clearTimeout(stableTimer);
-        if (interim) stableTimer = setTimeout(onStableInterim, looksLikeQuestion(interim) && words(interim) >= 4 ? STABLE_Q_MS : STABLE_MS);
-      }
+      onInterim(interim.trim());
     };
     rec.onerror = (e) => {
       if (e.error === "not-allowed" || e.error === "service-not-allowed") {
@@ -233,9 +231,99 @@
     rec.onend = () => {
       clearInterim();
       interimText = "";
-      if (active) setTimeout(() => { if (active) startRec(); }, 150);
+      if (active && engine === "browser") setTimeout(() => { if (active && engine === "browser") startRec(); }, 150);
     };
     rec.start();
+  }
+
+  function onInterim(interim) {
+    if (interim) showInterim(interim); else clearInterim();
+    if (interim !== interimText) {
+      interimText = interim;
+      clearTimeout(stableTimer);
+      if (interim) stableTimer = setTimeout(onStableInterim, looksLikeQuestion(interim) && words(interim) >= 4 ? STABLE_Q_MS : STABLE_MS);
+    }
+  }
+
+  const SDK_URL = "/vendor/speech-sdk-1.51.0.min.js";
+  const SDK_SRI = "sha384-M3ff7S+yGrJgt57GlKT5DSXOIH6BmWyNccNicmYs+IKE9j3IV0Mxjm2/CjqFdNez";
+  let engine = "browser";
+  let speechAuth = null;
+  let tokenTimer = null;
+
+  async function speechToken(force) {
+    if (!force && speechAuth && speechAuth.expires > Date.now()) return speechAuth;
+    const r = await fetch("/api/speech-token", { method: "POST" });
+    if (!r.ok) throw new Error(r.status === 404 ? "Azure Speech är inte konfigurerat" : `token ${r.status}`);
+    const d = await r.json();
+    speechAuth = { ...d, expires: Date.now() + 8 * 60_000 };
+    return speechAuth;
+  }
+
+  function loadSdk() {
+    if (window.SpeechSDK) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const el = document.createElement("script");
+      el.src = SDK_URL;
+      el.integrity = SDK_SRI;
+      el.crossOrigin = "anonymous";
+      el.onload = resolve;
+      el.onerror = () => reject(new Error("kunde inte ladda Azure Speech SDK"));
+      document.head.appendChild(el);
+    });
+  }
+
+  async function startAzure() {
+    await loadSdk();
+    const { token, region } = await speechToken(false);
+    const SDK = window.SpeechSDK;
+    const cfg = SDK.SpeechConfig.fromAuthorizationToken(token, region);
+    cfg.speechRecognitionLanguage = $("lang").value;
+    cfg.setProperty(SDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "500");
+    const recog = new SDK.SpeechRecognizer(cfg, SDK.AudioConfig.fromDefaultMicrophoneInput());
+    recog.recognizing = (_, e) => onInterim(e.result.text.trim());
+    recog.recognized = (_, e) => {
+      const text = e.result.text?.trim();
+      if (e.result.reason === SDK.ResultReason.RecognizedSpeech && text) onFinal(text);
+      onInterim("");
+    };
+    recog.canceled = (_, e) => {
+      if (e.reason !== SDK.CancellationReason.Error) return;
+      showError("Azure Speech: " + (e.errorDetails || e.errorCode));
+      if (active && engine === "azure") {
+        rec?.stop();
+        setTimeout(() => { if (active && engine === "azure") startAzure().catch(azureFailed); }, 1500);
+      }
+    };
+    await new Promise((resolve, reject) => recog.startContinuousRecognitionAsync(resolve, (err) => reject(new Error(String(err)))));
+    clearInterval(tokenTimer);
+    tokenTimer = setInterval(async () => {
+      try { recog.authorizationToken = (await speechToken(true)).token; } catch (e) { showError("Azure Speech-token: " + e.message); }
+    }, 8 * 60_000);
+    rec = {
+      stop() {
+        clearInterval(tokenTimer);
+        recog.stopContinuousRecognitionAsync(() => recog.close(), () => recog.close());
+      },
+    };
+  }
+
+  function azureFailed(e) {
+    showError("Azure Speech: " + e.message + " – använder webbläsarens taligenkänning.");
+    engine = "browser";
+    $("engine").value = "browser";
+    if (active && SR) startRec();
+  }
+
+  async function detectAzure() {
+    try {
+      await speechToken(true);
+      $("engine").hidden = false;
+      $("engine").value = "azure";
+    } catch {
+      $("engine").hidden = true;
+      $("engine").value = "browser";
+    }
   }
 
   function onStableInterim() {
@@ -547,19 +635,21 @@
   }
 
   async function start() {
-    if (!SR) { alert("Den här webbläsaren saknar taligenkänning. Använd Chrome eller Edge."); return; }
+    engine = $("engine").value === "azure" && !$("engine").hidden ? "azure" : "browser";
+    if (engine === "browser" && !SR) { alert("Den här webbläsaren saknar taligenkänning. Använd Chrome eller Edge."); return; }
     active = true;
     warm();
     $("toggle").textContent = "■ Stoppa";
     $("toggle").className = "stop";
-    setStatus("Lyssnar", true);
+    setStatus(engine === "azure" ? "Lyssnar (Azure EU)" : "Lyssnar", true);
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
-    startRec();
+    if (engine === "azure") startAzure().catch(azureFailed); else startRec();
   }
 
   function stop() {
     active = false;
     clearTimeout(stableTimer);
+    clearInterval(tokenTimer);
     if (rec) { try { rec.stop(); } catch {} rec = null; }
     clearInterim();
     interimText = "";
@@ -582,6 +672,7 @@
   $("toggle").onclick = () => (active ? stop() : start());
   $("help").onclick = helpNow;
   $("lang").onchange = () => { if (active) { stop(); start(); } };
+  $("engine").onchange = () => { if (active) { stop(); start(); } };
   $("ask").onsubmit = (e) => {
     e.preventDefault();
     const v = $("q").value.trim();
@@ -608,6 +699,7 @@
     }
   });
   warm();
+  detectAzure();
 })();
 </script>
 </body>

@@ -14,6 +14,7 @@ A talk-to-it demo of the receptionist for testing persona, guardrails and tool f
 |---|---|
 | `ANTHROPIC_API_KEY` | required |
 | `DEMO_MODEL` / `DEMO_EFFORT` / `DEMO_ASSISTANT_NAME` | optional |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | optional; enables EU speech recognition in the copilot (default region `swedencentral`) |
 
 ## Data
 `api/_data.json` is generated from `config/` and `prompts/`: `node demo/scripts/build-data.mjs` (needs the root `node_modules` for `yaml`).
@@ -34,4 +35,5 @@ Listens through the laptop mic while you take a call on speaker, transcribes it,
 - Both functions are warmed on page load and on Start to avoid cold starts.
 - Confirmed facts: `config/copilot-facts.yaml` (empty by default). Entries are matched by keyword, without AI, and shown instantly as "Bekräftat i byråns faktablad" with period, source and who verified them; they are also passed to the sourced answer. Only add facts a consultant has checked; rebuild `api/_data.json` after editing.
 - "Hjälp mig nu" (or space) answers the latest question from the last ~75 s of transcript.
-- Prototype only: speech recognition is the browser's (Google in Chrome), LLM is Anthropic (US). No real client calls until it runs on Azure Speech + an EU model.
+- Speech recognition: "Tal: Azure (EU)" when `AZURE_SPEECH_KEY` is set (Azure Speech SDK 1.51.0, self-hosted in `vendor/` with SRI; the browser gets a 10-minute token from `api/speech-token.js`, refreshed every 8 minutes; falls back to the browser engine on error), otherwise the browser's own (Google in Chrome).
+- Prototype only: the LLM is Anthropic (US). No real client calls until the LLM also runs on an EU endpoint.
