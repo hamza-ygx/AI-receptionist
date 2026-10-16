@@ -84,7 +84,7 @@ export default async function handler(req, res) {
       : `${context ? `<transkribering>\n${context}\n</transkribering>\n\n` : ""}Fråga: ${question}`;
 
   res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
-  const send = (o) => res.write(JSON.stringify(o) + "\n");
+  const send = (o) => { if (!res.destroyed && !res.writableEnded) res.write(JSON.stringify(o) + "\n"); };
 
   const messages = [{ role: "user", content: prompt }];
   const usage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, searches: 0 };
@@ -142,9 +142,9 @@ export default async function handler(req, res) {
     const sources = [...cited.values(), ...[...found.values()].filter((f) => !cited.has(f.url))];
     send({ t: "done", sources: sources.slice(0, 8), citedCount: cited.size, searches: usage.searches, costUsd, model: MODEL });
   } catch (e) {
-    if (e instanceof Anthropic.APIUserAbortError) return res.end();
+    if (e instanceof Anthropic.APIUserAbortError) return res.writableEnded || res.end();
     const err = e instanceof Anthropic.APIError ? `anthropic_${e.status}` : "internal";
     send({ t: "error", error: err, detail: String(e?.message ?? "").slice(0, 300) });
   }
-  res.end();
+  if (!res.writableEnded) res.end();
 }

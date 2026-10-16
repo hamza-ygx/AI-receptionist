@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   if (now && !context.trim()) return res.status(400).json({ error: "empty_context" });
 
   res.writeHead(200, { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" });
-  const send = (o) => res.write(JSON.stringify(o) + "\n");
+  const send = (o) => { if (!res.destroyed && !res.writableEnded) res.write(JSON.stringify(o) + "\n"); };
 
   const content = now
     ? `<samtal>\n${context}\n</samtal>`
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     for await (const event of stream) {
       if (event.type !== "content_block_delta" || event.delta.type !== "text_delta") continue;
       if (decided) { send({ t: "text", d: event.delta.text }); continue; }
-      head += event.delta.text;
+      head = (head + event.delta.text).replace(/^\s+/, "");
       const nl = head.indexOf("\n");
       const first = (nl >= 0 ? head.slice(0, nl) : head).trim();
       if (/^INGEN\b/i.test(first)) { send({ t: "none" }); stream.abort(); break; }
@@ -77,7 +77,11 @@ export default async function handler(req, res) {
     }
     if (!decided && !res.writableEnded) {
       const m = head.trim().match(/^F:\s*(.+)$/i);
-      if (m) send({ t: "q", question: m[1].slice(0, 300) });
+      if (m) {
+        const [q, ...rest] = m[1].split(/(?<=[?.])\s+/);
+        send({ t: "q", question: q.slice(0, 300) });
+        if (rest.length) send({ t: "text", d: rest.join(" ") });
+      }
     }
     send({ t: "done" });
   } catch (e) {
@@ -87,5 +91,5 @@ export default async function handler(req, res) {
       send({ t: "done" });
     }
   }
-  res.end();
+  if (!res.writableEnded) res.end();
 }

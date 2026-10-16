@@ -369,6 +369,8 @@
   function attachCard(job, question, line) {
     line?.el?.classList.add("flag");
     job.ui = makeCard(question);
+    job.ui.job = job;
+    job.ui.question = question;
     job.ui.started = job.started;
     job.ui.vState = { text: "" };
     if (!job.vCtl) {
@@ -460,7 +462,8 @@
       ui.status.textContent = "Söker i källor…";
     } else if (ev.t === "text") {
       st.text += ev.d;
-      if (/^\s*INGEN\s*$/i.test(st.text)) return;
+      const head = st.text.trim().toUpperCase();
+      if (head && "INGEN".startsWith(head)) return;
       if (!ui.verifiedStarted) {
         ui.verifiedStarted = true;
         ui.quickEl.remove();
@@ -472,6 +475,14 @@
       ui.status.textContent = "";
       ui.body.innerHTML = renderBody(st.text.replace(/^\s*\[[^\]\n]{3,300}\]\s*\n?/, ""));
     } else if (ev.t === "done") {
+      if (!ui.verifiedStarted && /^\s*INGEN\s*$/i.test(st.text) && !ui.retried) {
+        ui.retried = true;
+        st.text = "";
+        const job = ui.job;
+        job.vCtl = new AbortController();
+        runVerify(job, { mode: "question", question: ui.question, context: contextText(2500) });
+        return;
+      }
       ui.status.textContent = "";
       addCost(ev.costUsd);
       count++;
